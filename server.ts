@@ -1566,14 +1566,55 @@ app.prepare().then(() => {
           }
         }, 3000);
       }, 2500);
-    } else {
-      // Start next round
+    } else if (duel.currentRound >= 3) {
+      // After 3 rounds, whoever leads wins (even if they don't have 2 wins)
       setTimeout(() => {
-        if (duel.currentRound < 3) {
+        let winnerId: string;
+        if (duel.player1Wins > duel.player2Wins) {
+          winnerId = duel.player1Id;
+        } else if (duel.player2Wins > duel.player1Wins) {
+          winnerId = duel.player2Id;
+        } else {
+          // True tie after 3 rounds (0:0) - continue with extra round
           duel.currentRound++;
           duel.phase = 'choosing';
           startRPSRound(room, io);
+          return;
         }
+
+        duel.winnerId = winnerId;
+        duel.phase = 'result';
+        room.state.loserPickPlayerId = winnerId;
+
+        const winner = room.players.get(winnerId);
+        console.log(`✊✌️✋ RPS Duel Winner (after 3 rounds): ${winner?.name}`);
+
+        // Notify bot manager about RPS duel winner
+        if (dev) {
+          botManager.onRPSDuelWinner(room.code, winnerId);
+        }
+
+        io.to(room.code).emit('rps_duel_winner', {
+          winnerId,
+          winnerName: winner?.name,
+          player1Wins: duel.player1Wins,
+          player2Wins: duel.player2Wins,
+        });
+        io.to(room.code).emit('room_update', roomToClient(room));
+
+        // Let winner pick
+        setTimeout(() => {
+          if (room.state.phase === 'category_rps_duel') {
+            startRPSDuelPick(room, io);
+          }
+        }, 3000);
+      }, 2500);
+    } else {
+      // Start next round
+      setTimeout(() => {
+        duel.currentRound++;
+        duel.phase = 'choosing';
+        startRPSRound(room, io);
       }, 2500);
     }
   }
@@ -1686,15 +1727,45 @@ app.prepare().then(() => {
 
     const categoryData = loadCategories().get(selectedCategoryId);
     
-    io.to(room.code).emit('category_selected', { 
-      categoryId: selectedCategoryId,
-      categoryName: categoryData?.name,
-      categoryIcon: categoryData?.icon,
-    });
+    // If there's a tie, send tiebreaker event first with roulette animation
+    const isTie = winners.length > 1;
+    const tiedCategories = isTie 
+      ? winners.map(catId => {
+          const cat = room.state.votingCategories.find(c => c.id === catId);
+          return cat ? { id: cat.id, name: cat.name, icon: cat.icon } : null;
+        }).filter(Boolean)
+      : [];
 
-    setTimeout(() => {
-      startQuestion(room, io);
-    }, 2500);
+    if (isTie) {
+      console.log(`🎰 Voting tie between ${winners.length} categories, starting roulette...`);
+      io.to(room.code).emit('voting_tiebreaker', {
+        tiedCategories,
+        winnerId: selectedCategoryId,
+      });
+      
+      // Wait for roulette animation, then send category_selected
+      setTimeout(() => {
+        io.to(room.code).emit('category_selected', { 
+          categoryId: selectedCategoryId,
+          categoryName: categoryData?.name,
+          categoryIcon: categoryData?.icon,
+        });
+
+        setTimeout(() => {
+          startQuestion(room, io);
+        }, 2500);
+      }, 3000); // 3 seconds for roulette
+    } else {
+      io.to(room.code).emit('category_selected', { 
+        categoryId: selectedCategoryId,
+        categoryName: categoryData?.name,
+        categoryIcon: categoryData?.icon,
+      });
+
+      setTimeout(() => {
+        startQuestion(room, io);
+      }, 2500);
+    }
   }
 
   function startQuestion(room: GameRoom, io: SocketServer) {

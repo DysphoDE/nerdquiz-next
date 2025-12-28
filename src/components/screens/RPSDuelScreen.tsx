@@ -282,7 +282,7 @@ export function RPSDuelScreen() {
           <span className="font-bold">Schere, Stein, Papier</span>
           {phase === 'choosing' && (
             <span className="text-xs bg-red-500/30 px-2 py-0.5 rounded-full">
-              Runde {currentRound}/3
+              Runde {currentRound}{currentRound <= 3 ? '/3' : ' (Verlängerung)'}
             </span>
           )}
         </motion.div>

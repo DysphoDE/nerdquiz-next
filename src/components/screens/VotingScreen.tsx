@@ -1,14 +1,26 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/store/gameStore';
-import { Clock, Check } from 'lucide-react';
+import { getSocket } from '@/lib/socket';
+import { Clock, Check, Sparkles } from 'lucide-react';
 
 interface CategoryPosition {
   id: string;
   element: HTMLElement | null;
+}
+
+interface TiedCategory {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+interface TiebreakerData {
+  tiedCategories: TiedCategory[];
+  winnerId: string;
 }
 
 export function VotingScreen() {
@@ -20,6 +32,68 @@ export function VotingScreen() {
   const [voted, setVoted] = useState<string | null>(null);
   const categoryRefs = useRef<Map<string, HTMLElement>>(new Map());
   const waitingAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Tiebreaker roulette state
+  const [tiebreakerData, setTiebreakerData] = useState<TiebreakerData | null>(null);
+  const [rouletteIndex, setRouletteIndex] = useState(0);
+  const [rouletteFinished, setRouletteFinished] = useState(false);
+
+  // Listen for tiebreaker event
+  useEffect(() => {
+    const socket = getSocket();
+    
+    const handleTiebreaker = (data: TiebreakerData) => {
+      console.log('🎰 Voting tiebreaker:', data);
+      setTiebreakerData(data);
+      setRouletteIndex(0);
+      setRouletteFinished(false);
+    };
+    
+    socket.on('voting_tiebreaker', handleTiebreaker);
+    return () => {
+      socket.off('voting_tiebreaker', handleTiebreaker);
+    };
+  }, []);
+
+  // Roulette animation
+  useEffect(() => {
+    if (!tiebreakerData || rouletteFinished) return;
+    
+    const categories = tiebreakerData.tiedCategories;
+    const winnerIndex = categories.findIndex(c => c.id === tiebreakerData.winnerId);
+    
+    // Speed phases: fast -> medium -> slow -> stop
+    let interval: number;
+    let iterations = 0;
+    const totalIterations = 15 + winnerIndex; // Ensure we land on winner
+    
+    const animate = () => {
+      iterations++;
+      setRouletteIndex(prev => (prev + 1) % categories.length);
+      
+      if (iterations >= totalIterations) {
+        // Stop on winner
+        setRouletteIndex(winnerIndex);
+        setRouletteFinished(true);
+        return;
+      }
+      
+      // Slow down progressively
+      let delay: number;
+      if (iterations < 8) {
+        delay = 80;
+      } else if (iterations < 12) {
+        delay = 150;
+      } else {
+        delay = 250 + (iterations - 12) * 100;
+      }
+      
+      interval = window.setTimeout(animate, delay);
+    };
+    
+    interval = window.setTimeout(animate, 100);
+    return () => clearTimeout(interval);
+  }, [tiebreakerData, rouletteFinished]);
 
   if (!room) return null;
 
@@ -53,6 +127,100 @@ export function VotingScreen() {
   const waitingPlayers = players.filter(p => !votes[p.id]);
   // Players who have voted
   const votedPlayers = players.filter(p => votes[p.id]);
+
+  // Tiebreaker overlay
+  if (tiebreakerData) {
+    const currentCategory = tiebreakerData.tiedCategories[rouletteIndex];
+    const winnerCategory = tiebreakerData.tiedCategories.find(c => c.id === tiebreakerData.winnerId);
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-screen flex flex-col items-center justify-center p-4 md:p-8"
+      >
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          {/* Title */}
+          <motion.div
+            initial={{ y: -20 }}
+            animate={{ y: 0 }}
+            className="mb-8"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 text-amber-400 mb-4">
+              <Sparkles className="w-5 h-5" />
+              <span className="font-bold">Gleichstand!</span>
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black">
+              {rouletteFinished ? 'Gewinner:' : 'Zufallsentscheidung...'}
+            </h1>
+          </motion.div>
+
+          {/* Roulette Display */}
+          <div className="relative mb-8">
+            {/* All tied categories in a row */}
+            <div className="flex justify-center gap-4">
+              {tiebreakerData.tiedCategories.map((cat, i) => {
+                const isHighlighted = i === rouletteIndex;
+                const isWinner = rouletteFinished && cat.id === tiebreakerData.winnerId;
+                
+                return (
+                  <motion.div
+                    key={cat.id}
+                    animate={{
+                      scale: isHighlighted ? 1.2 : 0.8,
+                      opacity: isHighlighted ? 1 : 0.4,
+                    }}
+                    transition={{ duration: 0.1 }}
+                    className={`p-4 md:p-6 rounded-2xl glass text-center transition-all ${
+                      isWinner 
+                        ? 'ring-4 ring-amber-400 bg-amber-500/20 shadow-lg shadow-amber-500/30' 
+                        : isHighlighted 
+                          ? 'ring-2 ring-primary/50 bg-primary/10' 
+                          : ''
+                    }`}
+                  >
+                    <motion.span 
+                      className="text-4xl md:text-5xl block mb-2"
+                      animate={isWinner ? { 
+                        rotate: [0, -10, 10, -10, 10, 0],
+                        scale: [1, 1.1, 1]
+                      } : {}}
+                      transition={{ duration: 0.5 }}
+                    >
+                      {cat.icon}
+                    </motion.span>
+                    <span className="font-bold text-sm md:text-base">{cat.name}</span>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+          </div>
+
+          {/* Winner announcement */}
+          <AnimatePresence>
+            {rouletteFinished && winnerCategory && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-muted-foreground"
+              >
+                <span className="text-lg">
+                  🎉 <strong>{winnerCategory.name}</strong> wurde zufällig gewählt!
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
