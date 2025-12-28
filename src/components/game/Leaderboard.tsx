@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, Flame, Wifi, WifiOff, Check } from 'lucide-react';
 import { usePlayers } from '@/store/gameStore';
+import { GameAvatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 interface LeaderboardProps {
@@ -32,10 +33,10 @@ export function Leaderboard({ compact = false, showAnswerStatus = false }: Leade
               )}
             >
               {index === 0 && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
-              <img
-                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
-                alt=""
-                className="w-5 h-5 rounded-full bg-muted"
+              <GameAvatar 
+                seed={player.avatarSeed} 
+                mood={player.hasAnswered ? 'hopeful' : 'neutral'} 
+                size="xs" 
               />
               <span className="font-medium truncate max-w-[80px]">{player.name}</span>
               <span className="font-mono text-primary font-bold">{player.score}</span>
@@ -86,10 +87,10 @@ export function Leaderboard({ compact = false, showAnswerStatus = false }: Leade
 
             {/* Avatar */}
             <div className="relative">
-              <img
-                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
-                alt=""
-                className="w-10 h-10 rounded-full bg-muted"
+              <GameAvatar 
+                seed={player.avatarSeed} 
+                mood={player.streak > 2 ? 'happy' : 'neutral'} 
+                size="md" 
               />
               {showAnswerStatus && player.hasAnswered && (
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">

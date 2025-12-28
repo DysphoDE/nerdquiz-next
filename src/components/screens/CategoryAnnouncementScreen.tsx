@@ -116,7 +116,7 @@ export function CategoryAnnouncementScreen() {
             className="inline-flex items-center gap-4 px-6 py-4 rounded-2xl glass border-amber-500/50"
           >
             <img
-              src={`https://api.dicebear.com/7.x/bottts/svg?seed=${loserPlayer.avatarSeed}`}
+              src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(loserPlayer.avatarSeed)}&mood=hopeful`}
               alt=""
               className="w-12 h-12 rounded-full bg-muted"
             />

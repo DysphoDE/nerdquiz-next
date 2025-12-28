@@ -182,7 +182,7 @@ export function DevPanel() {
                             }`}
                           >
                             <img
-                              src={`https://api.dicebear.com/7.x/bottts/svg?seed=${p.avatarSeed}`}
+                              src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(p.avatarSeed)}&mood=neutral`}
                               alt=""
                               className="w-6 h-6 rounded-full"
                             />

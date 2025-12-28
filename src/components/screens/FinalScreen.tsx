@@ -81,7 +81,7 @@ export function FinalScreen() {
           className="flex items-center justify-center gap-4"
         >
           <img
-            src={`https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${winner.avatarSeed}`}
+            src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(winner.avatarSeed)}&mood=superHappy`}
             alt=""
             className="w-16 h-16 rounded-2xl bg-muted border-4 border-accent"
           />
@@ -111,7 +111,7 @@ export function FinalScreen() {
           >
             <div className="h-full glass rounded-t-2xl flex flex-col items-center justify-end p-4">
               <img
-                src={`https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${podium[1].avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(podium[1].avatarSeed)}&mood=happy`}
                 alt=""
                 className="w-10 h-10 rounded-lg bg-muted mb-2"
               />
@@ -133,7 +133,7 @@ export function FinalScreen() {
             <div className="h-full glass rounded-t-2xl flex flex-col items-center justify-end p-4 border-accent/30 bg-accent/5 relative overflow-hidden">
               <Sparkles className="absolute top-2 right-2 w-5 h-5 text-accent animate-pulse" />
               <img
-                src={`https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${podium[0].avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(podium[0].avatarSeed)}&mood=superHappy`}
                 alt=""
                 className="w-12 h-12 rounded-lg bg-muted border-2 border-accent mb-2"
               />
@@ -154,7 +154,7 @@ export function FinalScreen() {
           >
             <div className="h-full glass rounded-t-2xl flex flex-col items-center justify-end p-4">
               <img
-                src={`https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${podium[2].avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(podium[2].avatarSeed)}&mood=hopeful`}
                 alt=""
                 className="w-10 h-10 rounded-lg bg-muted mb-2"
               />
@@ -185,7 +185,7 @@ export function FinalScreen() {
                 {index + 4}
               </div>
               <img
-                src={`https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${player.avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=neutral`}
                 alt=""
                 className="w-8 h-8 rounded-lg bg-muted"
               />

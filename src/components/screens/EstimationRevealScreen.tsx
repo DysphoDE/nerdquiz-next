@@ -239,7 +239,7 @@ export function EstimationRevealScreen() {
 
                       {/* Avatar */}
                       <img
-                        src={`https://api.dicebear.com/7.x/bottts/svg?seed=${result.playerName}`}
+                        src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(result.avatarSeed)}&mood=${result.absDiff === 0 ? 'superHappy' : diffPercent <= 20 ? 'happy' : diffPercent <= 50 ? 'confused' : 'sad'}`}
                         alt=""
                         className="w-12 h-12 rounded-full bg-muted shrink-0"
                       />

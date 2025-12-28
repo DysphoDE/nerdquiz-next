@@ -241,7 +241,7 @@ export function RPSDuelScreen() {
           
           <div className="flex items-center justify-center gap-3 mb-6">
             <img
-              src={`https://api.dicebear.com/7.x/bottts/svg?seed=${winner?.avatarSeed}`}
+              src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(winner?.avatarSeed || '')}&mood=superHappy`}
               alt=""
               className="w-10 h-10 rounded-full bg-muted border-2 border-red-500"
             />
@@ -552,7 +552,7 @@ function PlayerCard({
       {/* Avatar */}
       <div className="relative">
         <img
-          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
+          src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=${isWinner ? 'superHappy' : isLoser ? 'sad' : 'neutral'}`}
           alt=""
           className={`w-20 h-20 md:w-24 md:h-24 rounded-full bg-muted border-4 ${
             isWinner ? 'border-red-500 shadow-lg shadow-red-500/30' : 'border-white/20'

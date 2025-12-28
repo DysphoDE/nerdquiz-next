@@ -156,7 +156,7 @@ export function VotingScreen() {
                         }}
                       >
                         <img
-                          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
+                          src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=hopeful`}
                           alt={player.name}
                           className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-muted border-2 border-primary shadow-lg"
                         />
@@ -272,7 +272,7 @@ function WuselingAvatar({
         }}
       >
         <motion.img
-          src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
+          src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=neutral`}
           alt={player.name}
           className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-muted/80 border-2 border-white/30 shadow-lg cursor-default"
           whileHover={{ scale: 1.1 }}

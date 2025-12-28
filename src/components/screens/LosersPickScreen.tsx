@@ -99,7 +99,7 @@ export function LosersPickScreen() {
             className="flex items-center justify-center gap-3 mb-6"
           >
             <img
-              src={`https://api.dicebear.com/7.x/bottts/svg?seed=${loserPlayer?.avatarSeed}`}
+              src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(loserPlayer?.avatarSeed || '')}&mood=happy`}
               alt=""
               className="w-12 h-12 rounded-full bg-muted border-2 border-amber-500"
             />
@@ -216,7 +216,7 @@ export function LosersPickScreen() {
             </h1>
             <div className="inline-flex items-center gap-4 px-6 py-4 rounded-2xl glass">
               <motion.img
-                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${loserPlayer?.avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(loserPlayer?.avatarSeed || '')}&mood=hopeful`}
                 alt=""
                 className="w-16 h-16 rounded-full bg-muted"
                 animate={{ 

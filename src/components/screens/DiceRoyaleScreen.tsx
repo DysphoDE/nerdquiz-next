@@ -203,7 +203,7 @@ export function DiceRoyaleScreen() {
           
           <div className="flex items-center justify-center gap-3 mb-6">
             <img
-              src={`https://api.dicebear.com/7.x/bottts/svg?seed=${winner?.avatarSeed}`}
+              src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(winner?.avatarSeed || '')}&mood=superHappy`}
               alt=""
               className="w-10 h-10 rounded-full bg-muted border-2 border-emerald-500"
             />
@@ -306,7 +306,7 @@ export function DiceRoyaleScreen() {
 
                 {/* Avatar */}
                 <img
-                  src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
+                  src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=hopeful`}
                   alt=""
                   className={`w-14 h-14 mx-auto rounded-full bg-muted mb-2 ${
                     isWinnerPlayer ? 'border-2 border-emerald-500' : ''

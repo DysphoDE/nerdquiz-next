@@ -19,7 +19,6 @@ import {
   RPSDuelScreen,
   QuestionScreen,
   EstimationScreen,
-  RevealScreen,
   EstimationRevealScreen,
   ScoreboardScreen,
   FinalScreen,
@@ -124,11 +123,11 @@ export default function RoomPage() {
       case 'category_rps_duel':
         return <RPSDuelScreen key="rps-duel" />;
       case 'question':
+      case 'revealing':
+        // QuestionScreen handles both question and revealing phases dynamically
         return <QuestionScreen key="question" />;
       case 'estimation':
         return <EstimationScreen key="estimation" />;
-      case 'revealing':
-        return <RevealScreen key="reveal" />;
       case 'estimation_reveal':
         return <EstimationRevealScreen key="estimation-reveal" />;
       case 'scoreboard':

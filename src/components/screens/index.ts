@@ -8,7 +8,6 @@ export { DiceRoyaleScreen } from './DiceRoyaleScreen';
 export { RPSDuelScreen } from './RPSDuelScreen';
 export { QuestionScreen } from './QuestionScreen';
 export { EstimationScreen } from './EstimationScreen';
-export { RevealScreen } from './RevealScreen';
 export { EstimationRevealScreen } from './EstimationRevealScreen';
 export { ScoreboardScreen } from './ScoreboardScreen';
 export { FinalScreen } from './FinalScreen';

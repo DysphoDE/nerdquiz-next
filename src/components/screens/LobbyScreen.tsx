@@ -103,7 +103,7 @@ function AnimatedAvatar({
           {/* The actual avatar image */}
           <motion.img
             key={seed} // Re-render on seed change for animation
-            src={`https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${seed}`}
+            src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(seed)}&mood=happy`}
             alt=""
             className="w-16 h-16 rounded-xl bg-muted relative z-10"
             initial={isRerolling ? { scale: 0.8, opacity: 0 } : false}

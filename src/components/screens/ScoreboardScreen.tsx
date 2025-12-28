@@ -62,7 +62,7 @@ export function ScoreboardScreen() {
               className="flex flex-col items-center"
             >
               <img
-                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${players[1]?.avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(players[1]?.avatarSeed || '')}&mood=happy`}
                 alt=""
                 className="w-16 h-16 rounded-full bg-muted mb-2 ring-4 ring-gray-400"
               />
@@ -86,7 +86,7 @@ export function ScoreboardScreen() {
                 <Crown className="w-8 h-8 text-yellow-500 mb-1" />
               </motion.div>
               <img
-                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${players[0]?.avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(players[0]?.avatarSeed || '')}&mood=superHappy`}
                 alt=""
                 className="w-20 h-20 rounded-full bg-muted mb-2 ring-4 ring-yellow-500"
               />
@@ -104,7 +104,7 @@ export function ScoreboardScreen() {
               className="flex flex-col items-center"
             >
               <img
-                src={`https://api.dicebear.com/7.x/bottts/svg?seed=${players[2]?.avatarSeed}`}
+                src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(players[2]?.avatarSeed || '')}&mood=hopeful`}
                 alt=""
                 className="w-14 h-14 rounded-full bg-muted mb-2 ring-4 ring-amber-700"
               />
@@ -151,7 +151,7 @@ export function ScoreboardScreen() {
 
                   {/* Avatar */}
                   <img
-                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${player.avatarSeed}`}
+                    src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=neutral`}
                     alt=""
                     className={cn(
                       'w-12 h-12 rounded-full bg-muted',
