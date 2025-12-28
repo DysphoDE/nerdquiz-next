@@ -552,7 +552,7 @@ function PlayerCard({
       {/* Avatar */}
       <div className="relative">
         <img
-          src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=${isWinner ? 'superHappy' : isLoser ? 'sad' : 'neutral'}`}
+          src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=${isWinner ? 'superHappy' : 'hopeful'}`}
           alt=""
           className={`w-20 h-20 md:w-24 md:h-24 rounded-full bg-muted border-4 ${
             isWinner ? 'border-red-500 shadow-lg shadow-red-500/30' : 'border-white/20'

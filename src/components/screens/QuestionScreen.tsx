@@ -416,7 +416,7 @@ export function QuestionScreen() {
 
             {/* My Result Banner */}
             <AnimatePresence>
-              {revealPhase === 'done' && myResult && (
+              {(revealPhase === 'waiting' || revealPhase === 'returning') && myResult && (
                 <motion.div
                   initial={{ opacity: 0, y: 20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
