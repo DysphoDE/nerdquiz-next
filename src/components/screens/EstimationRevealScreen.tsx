@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, ArrowRight, Crown, TrendingUp, TrendingDown, Sparkles } from 'lucide-react';
+import { Target, ArrowRight, Crown, TrendingUp, TrendingDown, Sparkles, Crosshair, Trophy, Zap } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, useIsHost, useMyResult } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
@@ -157,7 +157,7 @@ export function EstimationRevealScreen() {
           transition={{ delay: 0.3 }}
           className="mb-8"
         >
-          <Card className="glass p-8 sm:p-12 text-center border-secondary/50 glow-secondary relative overflow-hidden">
+          <Card className="glass p-4 sm:p-8 md:p-12 text-center border-secondary/50 glow-secondary relative overflow-hidden">
             {/* Background effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-secondary/10 via-transparent to-primary/10" />
             
@@ -167,18 +167,18 @@ export function EstimationRevealScreen() {
               transition={{ type: 'spring', stiffness: 500, damping: 30, delay: 0.5 }}
               className="relative"
             >
-              <Target className="w-12 h-12 mx-auto mb-4 text-secondary" />
-              <p className="text-sm text-muted-foreground uppercase font-bold tracking-wider mb-3">
+              <Target className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-secondary" />
+              <p className="text-xs sm:text-sm text-muted-foreground uppercase font-bold tracking-wider mb-2 sm:mb-3">
                 Die richtige Antwort ist
               </p>
-              <div className="text-6xl sm:text-7xl md:text-8xl font-mono font-black text-secondary">
+              <div className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-mono font-black text-secondary">
                 <AnimatedNumber 
                   value={correctValue} 
                   duration={2500}
                   onComplete={() => setCountingDone(true)}
                 />
                 {question.unit && (
-                  <span className="text-2xl sm:text-3xl ml-3 text-muted-foreground">
+                  <span className="text-base sm:text-xl md:text-2xl ml-2 sm:ml-3 text-muted-foreground">
                     {question.unit}
                   </span>
                 )}
@@ -304,15 +304,92 @@ export function EstimationRevealScreen() {
                       </div>
                     </div>
 
-                    {/* Mobile quip */}
-                    <motion.p
+                    {/* Points Breakdown - Desktop */}
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      transition={{ delay: 0.6 }}
+                      className="hidden sm:flex items-center justify-end gap-4 mt-3 pt-3 border-t border-white/10"
+                    >
+                      {/* Accuracy Points */}
+                      {result.accuracyPoints !== undefined && (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Crosshair className="w-3.5 h-3.5 text-blue-400" />
+                          <span className="text-muted-foreground">Genauigkeit:</span>
+                          <span className={cn(
+                            'font-mono font-bold',
+                            result.accuracyPoints > 700 ? 'text-green-400' :
+                            result.accuracyPoints > 400 ? 'text-yellow-400' :
+                            result.accuracyPoints > 0 ? 'text-orange-400' : 'text-red-400'
+                          )}>
+                            +{result.accuracyPoints}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Rank Bonus */}
+                      {result.rankBonus !== undefined && result.rankBonus > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-muted-foreground">Platz {rank}:</span>
+                          <span className="font-mono font-bold text-amber-400">
+                            +{result.rankBonus}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Perfect Bonus */}
+                      {result.perfectBonus !== undefined && result.perfectBonus > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Zap className="w-3.5 h-3.5 text-purple-400" />
+                          <span className="text-muted-foreground">Perfekt:</span>
+                          <span className="font-mono font-bold text-purple-400">
+                            +{result.perfectBonus}
+                          </span>
+                        </div>
+                      )}
+                    </motion.div>
+
+                    {/* Mobile: Quip + Points Breakdown */}
+                    <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.4 }}
-                      className="text-xs text-muted-foreground mt-2 text-center sm:hidden"
+                      className="sm:hidden mt-3 pt-3 border-t border-white/10"
                     >
-                      {quip.text}
-                    </motion.p>
+                      <p className="text-xs text-muted-foreground text-center mb-2">
+                        {quip.text}
+                      </p>
+                      <div className="flex items-center justify-center gap-3 text-xs">
+                        {result.accuracyPoints !== undefined && (
+                          <div className="flex items-center gap-1">
+                            <Crosshair className="w-3 h-3 text-blue-400" />
+                            <span className={cn(
+                              'font-mono font-bold',
+                              result.accuracyPoints > 0 ? 'text-blue-400' : 'text-muted-foreground'
+                            )}>
+                              +{result.accuracyPoints}
+                            </span>
+                          </div>
+                        )}
+                        {result.rankBonus !== undefined && result.rankBonus > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Trophy className="w-3 h-3 text-amber-400" />
+                            <span className="font-mono font-bold text-amber-400">
+                              +{result.rankBonus}
+                            </span>
+                          </div>
+                        )}
+                        {result.perfectBonus !== undefined && result.perfectBonus > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-purple-400" />
+                            <span className="font-mono font-bold text-purple-400">
+                              +{result.perfectBonus}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
                   </Card>
                 </motion.div>
               );

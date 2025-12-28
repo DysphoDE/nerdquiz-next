@@ -1914,19 +1914,40 @@ app.prepare().then(() => {
 
     const results: any[] = [];
     
+    // NEW: Accuracy-based scoring system
+    // - Accuracy points: Based on how close you are (max 1000 points)
+    // - Rank bonus: Small bonus for placement (1st: 300, 2nd: 200, 3rd: 100, rest: 50)
+    // - Perfect bonus: Extra 500 for exact answer
+    
+    const rankBonuses = [300, 200, 100]; // Top 3 get extra bonus
+    const baseRankBonus = 50; // Everyone else gets 50
+    const maxAccuracyPoints = 1000;
+    const perfectBonus = 500;
+    
     playerEstimates.forEach((entry, index) => {
-      let basePoints = 0;
+      let accuracyPoints = 0;
       let rankBonus = 0;
-      let perfectBonus = 0;
+      let perfect = 0;
       
       if (entry.estimation !== null) {
-        // Points based on ranking
-        const rankPoints = [1500, 1200, 1000, 800, 600, 400, 300, 200, 100, 50];
-        basePoints = rankPoints[index] || 25;
+        // Calculate percentage deviation from correct value
+        // Use max(correctValue, 1) to avoid division by zero
+        const percentageOff = (entry.absDiff / Math.max(Math.abs(correctValue), 1)) * 100;
+        
+        // Accuracy points: Linear scale from 100% (0 points) to 0% (1000 points)
+        // If more than 100% off, you get 0 accuracy points
+        if (percentageOff <= 100) {
+          accuracyPoints = Math.round(maxAccuracyPoints * (1 - percentageOff / 100));
+        } else {
+          accuracyPoints = 0;
+        }
+        
+        // Rank bonus (smaller than before, just a tie-breaker)
+        rankBonus = index < rankBonuses.length ? rankBonuses[index] : baseRankBonus;
         
         // Perfect answer bonus
         if (entry.absDiff === 0) {
-          perfectBonus = 500;
+          perfect = perfectBonus;
         }
         
         entry.player.streak++;
@@ -1934,7 +1955,7 @@ app.prepare().then(() => {
         entry.player.streak = 0;
       }
 
-      const points = basePoints + perfectBonus;
+      const points = accuracyPoints + rankBonus + perfect;
       entry.player.score += points;
       
       results.push({
@@ -1943,9 +1964,9 @@ app.prepare().then(() => {
         avatarSeed: entry.player.avatarSeed,
         correct: entry.absDiff === 0,
         points,
-        basePoints,
-        timeBonus: 0, // No time bonus for estimation
-        streakBonus: 0,
+        basePoints: accuracyPoints, // Accuracy-based points
+        timeBonus: 0,
+        streakBonus: rankBonus, // Reuse field for rank bonus display
         streak: entry.player.streak,
         newScore: entry.player.score,
         answerOrder: answerOrderMap.get(entry.player.id) || null,
@@ -1956,6 +1977,9 @@ app.prepare().then(() => {
         diff: entry.diff,
         absDiff: entry.estimation !== null ? entry.absDiff : null,
         rank: index + 1,
+        accuracyPoints, // NEW: Send accuracy points for UI
+        rankBonus, // NEW: Send rank bonus for UI
+        perfectBonus: perfect, // NEW: Send perfect bonus for UI
       });
     });
 

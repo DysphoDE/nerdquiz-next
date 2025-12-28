@@ -40,6 +40,9 @@ export function QuestionScreen() {
   const [flyingIndex, setFlyingIndex] = useState(-1);
   const [showPointsFor, setShowPointsFor] = useState<Set<string>>(new Set());
   
+  // Store scores before reveal to prevent spoilers
+  const [frozenScores, setFrozenScores] = useState<Map<string, number>>(new Map());
+  
   // Position tracking refs
   const containerRef = useRef<HTMLDivElement>(null);
   const leaderboardSlotRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -142,6 +145,16 @@ export function QuestionScreen() {
     const interval = setInterval(update, 100);
     return () => clearInterval(interval);
   }, [room?.timerEnd, isRevealing]);
+
+  // Track scores during answering phase (before reveal updates them)
+  useEffect(() => {
+    if (revealPhase === 'answering' && !isRevealing) {
+      // Continuously update frozen scores during answering phase
+      const scoreMap = new Map<string, number>();
+      players.forEach(p => scoreMap.set(p.id, p.score));
+      setFrozenScores(scoreMap);
+    }
+  }, [revealPhase, isRevealing, players]);
 
   // Start reveal animation
   useEffect(() => {
@@ -316,7 +329,11 @@ export function QuestionScreen() {
 
             {/* Answer Buttons */}
             <motion.div 
-              className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
+              className={cn(
+                "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4",
+                // On mobile during reveal: use 2 columns and smaller gaps
+                isExpanded && "max-sm:grid-cols-2 max-sm:gap-2"
+              )}
               animate={{ gap: isExpanded ? '1rem' : undefined }}
             >
               {question.answers?.map((answer, index) => {
@@ -336,15 +353,22 @@ export function QuestionScreen() {
                     animate={{ 
                       opacity: 1, 
                       y: 0,
-                      minHeight: isExpanded ? '180px' : undefined,
+                      // Smaller min-height on mobile during reveal
+                      minHeight: isExpanded ? undefined : undefined,
                     }}
                     transition={{ delay: index * 0.1, layout: { duration: 0.5, type: 'spring' } }}
-                    className="relative"
+                    className={cn(
+                      "relative",
+                      // Ensure min-height on desktop, smaller on mobile
+                      isExpanded && "sm:min-h-[180px] min-h-[120px]"
+                    )}
                   >
                     <motion.div
                       onClick={() => !isRevealing && handleAnswer(index)}
                       className={cn(
                         'relative w-full h-full p-4 rounded-xl border-2 transition-all cursor-pointer',
+                        // Smaller padding on mobile during reveal
+                        isExpanded && 'max-sm:p-2',
                         colors.border,
                         colors.bg,
                         hasSubmitted && selectedAnswer === index && !isRevealing && 'ring-4 ring-white/50',
@@ -362,22 +386,34 @@ export function QuestionScreen() {
                             animate={{ scale: 1, rotate: 0 }}
                             exit={{ scale: 0 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                            className="absolute -top-3 -right-3 w-10 h-10 rounded-full flex items-center justify-center z-20 bg-green-500 shadow-lg shadow-green-500/50"
+                            className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center z-20 bg-green-500 shadow-lg shadow-green-500/50"
                           >
-                            <Check className="w-6 h-6 text-white" />
+                            <Check className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </motion.div>
                         )}
                       </AnimatePresence>
 
                       {/* Answer Content */}
-                      <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "flex items-start gap-3",
+                        // Smaller on mobile during reveal
+                        isExpanded && "max-sm:gap-2"
+                      )}>
                         <div className={cn(
                           'w-10 h-10 rounded-lg flex items-center justify-center font-bold shrink-0',
+                          // Smaller letter badge on mobile during reveal
+                          isExpanded && 'max-sm:w-7 max-sm:h-7 max-sm:text-sm max-sm:rounded-md',
                           colors.bg, colors.text, 'border', colors.border
                         )}>
                           {String.fromCharCode(65 + index)}
                         </div>
-                        <span className="font-medium text-base sm:text-lg pt-2">{answer}</span>
+                        <span className={cn(
+                          "font-medium text-base sm:text-lg pt-2",
+                          // Smaller text on mobile during reveal
+                          isExpanded && "max-sm:text-xs max-sm:pt-1 max-sm:leading-tight"
+                        )}>
+                          {answer}
+                        </span>
                       </div>
 
                       {/* Avatar Landing Zone */}
@@ -387,7 +423,11 @@ export function QuestionScreen() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="mt-4 min-h-[80px] flex flex-wrap gap-3 justify-start items-end"
+                            className={cn(
+                              "mt-4 min-h-[80px] flex flex-wrap gap-3 justify-start items-end",
+                              // Smaller on mobile
+                              "max-sm:mt-2 max-sm:min-h-[50px] max-sm:gap-1.5"
+                            )}
                           >
                             {/* Render avatars sorted by answer order (first to answer = leftmost) */}
                             {avatarsAtAnswer
@@ -403,6 +443,7 @@ export function QuestionScreen() {
                                   isAtCorrectAnswer={isCorrect}
                                   shouldCelebrate={showCorrect && isCorrect && revealPhase !== 'returning'}
                                   revealPhase={revealPhase}
+                                  compact={true}
                                 />
                               ))}
                           </motion.div>
@@ -488,12 +529,18 @@ export function QuestionScreen() {
               )}
             </AnimatePresence>
 
-            {/* Mobile Leaderboard */}
-            {!isRevealing && (
-              <div className="lg:hidden mt-6">
-                <MobileLeaderboard players={players} showAnswerStatus />
-              </div>
-            )}
+            {/* Mobile Leaderboard - show during answering and reveal phases */}
+            <div className="lg:hidden mt-4">
+              <MobileLeaderboard 
+                players={players} 
+                showAnswerStatus={!isRevealing}
+                frozenScores={frozenScores}
+                useFreeze={revealPhase !== 'answering' && !['points', 'waiting', 'returning'].includes(revealPhase)}
+                lastResults={lastResults}
+                showUpdatedScores={['points', 'waiting', 'returning'].includes(revealPhase)}
+                avatarTargets={avatarTargets}
+              />
+            </div>
           </div>
 
           {/* Desktop Leaderboard */}
@@ -580,14 +627,34 @@ export function QuestionScreen() {
 
                     {/* Score */}
                     <div className="text-right shrink-0">
-                      <motion.span
-                        key={player.score}
-                        initial={showPts ? { scale: 1.3, color: '#22c55e' } : false}
-                        animate={{ scale: 1, color: 'var(--primary)' }}
-                        className="font-mono font-black text-lg text-primary block"
-                      >
-                        {player.score.toLocaleString()}
-                      </motion.span>
+                      {/* Use frozen scores during reveal, update to newScore when points phase starts */}
+                      {(() => {
+                        const isShowingPoints = showPointsFor.has(player.id);
+                        // Phases where we should show updated scores (after points have been revealed)
+                        const hasRevealedPoints = ['points', 'waiting', 'returning'].includes(revealPhase);
+                        
+                        let displayScore: number;
+                        if (hasRevealedPoints && result?.newScore !== undefined) {
+                          // After points phase started - always show updated score
+                          displayScore = result.newScore;
+                        } else if (revealPhase !== 'answering' && frozenScores.has(player.id)) {
+                          // During reveal animation (before points) - show frozen score
+                          displayScore = frozenScores.get(player.id)!;
+                        } else {
+                          // Normal state - show current score
+                          displayScore = player.score;
+                        }
+                        return (
+                          <motion.span
+                            key={displayScore}
+                            initial={isShowingPoints ? { scale: 1.3, color: '#22c55e' } : false}
+                            animate={{ scale: 1, color: 'var(--primary)' }}
+                            className="font-mono font-black text-lg text-primary block"
+                          >
+                            {displayScore.toLocaleString()}
+                          </motion.span>
+                        );
+                      })()}
                       <AnimatePresence>
                         {showPts && (
                           <motion.span
@@ -620,6 +687,7 @@ function AnswerAvatar({
   isAtCorrectAnswer,
   shouldCelebrate,
   revealPhase,
+  compact = false,
 }: { 
   result: AnswerResult; 
   showPoints: boolean; 
@@ -627,6 +695,7 @@ function AnswerAvatar({
   isAtCorrectAnswer: boolean;
   shouldCelebrate: boolean;
   revealPhase: RevealPhase;
+  compact?: boolean;
 }) {
   const isCorrect = result.correct;
   
@@ -688,19 +757,24 @@ function AnswerAvatar({
         <GameAvatar
           seed={result.avatarSeed}
           mood={mood}
-          size="lg"
+          size={compact ? "sm" : "lg"}
           className={cn(
-            'border-3 shadow-lg',
+            'border-2 sm:border-3 shadow-lg',
+            // Smaller on mobile via compact prop
+            compact && 'max-sm:w-8 max-sm:h-8',
             isRevealed && isCorrect ? 'border-green-500 bg-green-500/20' : 'border-muted-foreground/50 bg-muted/20'
           )}
         />
-        {/* Time Badge */}
+        {/* Time Badge - hide on mobile compact */}
         {result.responseTimeMs != null && (
           <motion.div 
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: slotIndex * 0.08 + 0.2, type: 'spring' }}
-            className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-cyan-500 text-[9px] font-bold text-white shadow-md"
+            className={cn(
+              "absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-cyan-500 text-[9px] font-bold text-white shadow-md",
+              compact && "max-sm:hidden"
+            )}
           >
             {(result.responseTimeMs / 1000).toFixed(1)}s
           </motion.div>
@@ -711,7 +785,11 @@ function AnswerAvatar({
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: slotIndex * 0.08 + 0.15 }}
-        className="text-[10px] mt-1 font-medium text-center truncate max-w-[60px]"
+        className={cn(
+          "text-[10px] mt-1 font-medium text-center truncate max-w-[60px]",
+          // Smaller name on mobile compact but still visible
+          compact && "max-sm:text-[8px] max-sm:max-w-[40px] max-sm:mt-0.5"
+        )}
       >
         {result.playerName}
       </motion.span>
@@ -724,11 +802,17 @@ function AnswerAvatar({
             animate={{ opacity: 1, y: -8, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.5 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            className="absolute -top-12 left-1/2 -translate-x-1/2 z-50"
+            className={cn(
+              "absolute -top-12 left-1/2 -translate-x-1/2 z-50",
+              // Smaller and closer on mobile
+              compact && "max-sm:-top-8"
+            )}
           >
             <motion.div 
               className={cn(
                 'px-3 py-1.5 rounded-xl font-mono font-bold text-sm shadow-xl border',
+                // Smaller on mobile
+                compact && 'max-sm:px-1.5 max-sm:py-0.5 max-sm:text-[10px] max-sm:rounded-lg',
                 result.points > 0 
                   ? 'bg-gradient-to-r from-green-500 to-emerald-400 text-white border-green-400' 
                   : 'bg-muted text-muted-foreground border-muted'
@@ -746,31 +830,114 @@ function AnswerAvatar({
 }
 
 // Mobile Leaderboard
-function MobileLeaderboard({ players, showAnswerStatus = false }: { players: Player[]; showAnswerStatus?: boolean }) {
-  const sorted = [...players].sort((a, b) => b.score - a.score);
+function MobileLeaderboard({ 
+  players, 
+  showAnswerStatus = false,
+  frozenScores,
+  useFreeze = false,
+  lastResults,
+  showUpdatedScores = false,
+  avatarTargets,
+}: { 
+  players: Player[]; 
+  showAnswerStatus?: boolean;
+  frozenScores?: Map<string, number>;
+  useFreeze?: boolean;
+  lastResults?: AnswerResult[] | null;
+  showUpdatedScores?: boolean;
+  avatarTargets?: Map<string, AvatarTarget>;
+}) {
+  // Calculate display scores based on phase
+  const playersWithScores = players.map(p => {
+    let displayScore = p.score;
+    
+    if (showUpdatedScores && lastResults) {
+      // Use newScore from results
+      const result = lastResults.find(r => r.playerId === p.id);
+      if (result?.newScore !== undefined) {
+        displayScore = result.newScore;
+      }
+    } else if (useFreeze && frozenScores?.has(p.id)) {
+      // Use frozen score
+      displayScore = frozenScores.get(p.id)!;
+    }
+    
+    return { ...p, displayScore };
+  });
+  
+  const sorted = [...playersWithScores].sort((a, b) => b.displayScore - a.displayScore);
+  
   return (
     <div className="flex flex-wrap gap-2 justify-center">
       <AnimatePresence mode="popLayout">
-        {sorted.map((player, i) => (
-          <motion.div
-            key={player.id}
-            layout
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-full glass text-sm',
-              i === 0 && 'border-yellow-500/50 bg-yellow-500/10',
-              !player.isConnected && 'opacity-50'
-            )}
-          >
-            {i === 0 && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
-            <GameAvatar seed={player.avatarSeed} mood="neutral" size="xs" />
-            <span className="font-medium truncate max-w-[80px]">{player.name}</span>
-            <span className="font-mono text-primary font-bold">{player.score}</span>
-            {showAnswerStatus && player.hasAnswered && <Check className="w-3.5 h-3.5 text-green-500" />}
-          </motion.div>
-        ))}
+        {sorted.map((player, i) => {
+          const result = lastResults?.find(r => r.playerId === player.id);
+          const pointsGained = result?.points ?? 0;
+          const showPointsBadge = showUpdatedScores && pointsGained > 0;
+          
+          // Check if avatar is flying to an answer
+          const target = avatarTargets?.get(player.id);
+          const isFlying = target?.type === 'answer';
+          
+          return (
+            <motion.div
+              key={player.id}
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className={cn(
+                'flex items-center gap-2 px-3 py-1.5 rounded-full glass text-sm',
+                i === 0 && 'border-yellow-500/50 bg-yellow-500/10',
+                !player.isConnected && 'opacity-50'
+              )}
+            >
+              {i === 0 && <Crown className="w-3.5 h-3.5 text-yellow-500" />}
+              
+              {/* Avatar with flying animation */}
+              <div className="relative w-6 h-6">
+                <motion.div
+                  animate={{ 
+                    opacity: isFlying ? 0 : 1,
+                    scale: isFlying ? 0.3 : 1,
+                    y: isFlying ? -10 : 0,
+                  }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                >
+                  <GameAvatar seed={player.avatarSeed} mood="neutral" size="xs" />
+                </motion.div>
+                {/* Placeholder when flying */}
+                {isFlying && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 rounded-full bg-muted/30 border border-dashed border-muted-foreground/30"
+                  />
+                )}
+              </div>
+              
+              <span className="font-medium truncate max-w-[80px]">{player.name}</span>
+              <motion.span 
+                key={player.displayScore}
+                initial={showPointsBadge ? { scale: 1.2, color: '#22c55e' } : false}
+                animate={{ scale: 1, color: 'var(--primary)' }}
+                className="font-mono text-primary font-bold"
+              >
+                {player.displayScore}
+              </motion.span>
+              {showPointsBadge && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-[10px] font-mono font-bold text-green-500"
+                >
+                  +{pointsGained}
+                </motion.span>
+              )}
+              {showAnswerStatus && player.hasAnswered && <Check className="w-3.5 h-3.5 text-green-500" />}
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </div>
   );

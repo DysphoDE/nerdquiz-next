@@ -145,8 +145,8 @@ export function EstimationScreen() {
                   </motion.div>
                   <h3 className="text-xl font-bold mb-2">Antwort gesendet!</h3>
                   <p className="text-muted-foreground mb-4">
-                    Deine Schätzung: <span className="font-mono font-bold text-secondary text-2xl">{estimationValue}</span>
-                    {question.unit && <span className="text-lg ml-2">{question.unit}</span>}
+                    Deine Schätzung: <span className="font-mono font-bold text-secondary text-lg sm:text-xl lg:text-2xl">{estimationValue}</span>
+                    {question.unit && <span className="text-sm sm:text-base lg:text-lg ml-2">{question.unit}</span>}
                   </p>
                   <p className="text-sm text-muted-foreground animate-pulse">
                     Warte auf andere Spieler...
@@ -171,11 +171,11 @@ export function EstimationScreen() {
                       onChange={(e) => setEstimationValue(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder="Deine Schätzung..."
-                      className="w-full text-center text-4xl sm:text-5xl font-mono font-bold bg-transparent border-b-4 border-primary/50 focus:border-primary outline-none py-4 placeholder:text-muted-foreground/30"
+                      className="w-full text-center text-2xl sm:text-3xl lg:text-4xl font-mono font-bold bg-transparent border-b-4 border-primary/50 focus:border-primary outline-none py-3 sm:py-4 placeholder:text-muted-foreground/30 placeholder:text-lg"
                       autoComplete="off"
                     />
                     {question.unit && (
-                      <span className="absolute right-0 bottom-4 text-2xl text-muted-foreground font-medium">
+                      <span className="absolute right-0 bottom-3 sm:bottom-4 text-base sm:text-xl lg:text-2xl text-muted-foreground font-medium">
                         {question.unit}
                       </span>
                     )}
