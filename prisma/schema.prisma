@@ -6,24 +6,30 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  // URL wird in prisma.config.ts konfiguriert (Prisma 7+)
 }
 
 // ============================================
-// QUIZ & FRAGEN (Cold Data - Persistenz)
+// QUIZ & FRAGEN (JSONB-basiert für Flexibilität)
 // ============================================
 
 model Category {
   id          String     @id @default(cuid())
-  name        String     @unique
-  displayName String
+  slug        String     @unique // "gaming", "filme_serien", "wissenschaft"
+  name        String     // "Gaming", "Filme & Serien"
   description String?
-  icon        String?    // Emoji oder Icon-Name
-  color       String?    // Hex-Farbe für UI
+  icon        String     // Emoji: "🎮", "🎬"
+  color       String?    // Hex-Farbe für UI: "#6366f1"
+  sortOrder   Int        @default(0) // Für manuelle Sortierung
+  isActive    Boolean    @default(true) // Kategorie aktivieren/deaktivieren
+  
   questions   Question[]
+  
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  @@index([isActive])
   @@map("categories")
 }
 
@@ -32,41 +38,68 @@ model Question {
   categoryId   String
   category     Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   
-  // Frage-Inhalt
-  text         String
+  // Basis-Felder
+  text         String       // Die Frage selbst
   type         QuestionType @default(MULTIPLE_CHOICE)
   difficulty   Difficulty   @default(MEDIUM)
   
-  // Für Multiple Choice
-  answers      String[]     // Array von Antworten
-  correctIndex Int?         // Index der korrekten Antwort (0-3)
+  // JSONB Content - Struktur abhängig vom Type
+  // MULTIPLE_CHOICE: { correctAnswer: string, incorrectAnswers: string[] }
+  // ESTIMATION: { correctValue: number, unit: string, tolerance?: number }
+  // TRUE_FALSE: { correctAnswer: boolean }
+  // SORTING: { items: string[], labels?: { top: string, bottom: string } }
+  // TEXT_INPUT: { acceptedAnswers: string[], caseSensitive?: boolean }
+  // MATCHING: { pairs: { clue: string, match: string }[] }
+  content      Json
   
-  // Für Schätzfragen
-  correctValue Float?       // Korrekte Zahl bei Schätzfragen
-  unit         String?      // Einheit (z.B. "km", "Jahre", "Meter")
-  tolerance    Float?       // Toleranz in Prozent für Schätzfragen
+  // Medien-Support
+  mediaType    MediaType    @default(NONE)
+  mediaUrl     String?      // URL zu Supabase Storage oder extern
   
   // Metadaten
   explanation  String?      // Optionale Erklärung nach Beantwortung
-  source       String?      // Quellenangabe
-  imageUrl     String?      // Optionales Bild zur Frage
+  source       String?      // "manual", "opentdb", "community"
+  externalId   String?      // ID aus externen Quellen (OpenTDB)
+  
+  // Statistiken
+  timesPlayed  Int          @default(0)
+  timesCorrect Int          @default(0)
+  
+  // Status
+  isVerified   Boolean      @default(false) // Von Admin geprüft
+  isActive     Boolean      @default(true)  // Frage aktivieren/deaktivieren
   
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
+  @@unique([source, externalId]) // Verhindert Duplikate bei Imports
   @@index([categoryId])
+  @@index([type])
+  @@index([difficulty])
+  @@index([isActive])
   @@map("questions")
 }
 
 enum QuestionType {
-  MULTIPLE_CHOICE
-  ESTIMATION
+  MULTIPLE_CHOICE  // Standard: 4 Antworten, eine richtig
+  ESTIMATION       // Schätzfrage mit Zahlenwert
+  TRUE_FALSE       // Wahr/Falsch (OpenTDB boolean)
+  SORTING          // Elemente in richtige Reihenfolge bringen
+  TEXT_INPUT       // Freitext-Eingabe (für Bildrätsel)
+  MATCHING         // Zuordnungsfrage (Zitat → Person)
 }
 
 enum Difficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum MediaType {
+  NONE
+  IMAGE
+  AUDIO
+  VIDEO
 }
 
 // ============================================
@@ -95,6 +128,7 @@ model GameSession {
   createdAt    DateTime     @default(now())
 
   @@index([roomCode])
+  @@index([createdAt])
   @@map("game_sessions")
 }
 
@@ -122,7 +156,7 @@ enum GameStatus {
 }
 
 // ============================================
-// OPTIONALER USER (für zukünftige Features)
+// ADMIN & USER
 // ============================================
 
 model User {
@@ -130,6 +164,7 @@ model User {
   username     String   @unique
   displayName  String
   avatarSeed   String?  // Für DiceBear Avatare
+  role         UserRole @default(PLAYER)
   
   // Statistiken
   gamesPlayed  Int      @default(0)
@@ -140,4 +175,30 @@ model User {
   updatedAt    DateTime @updatedAt
 
   @@map("users")
+}
+
+enum UserRole {
+  PLAYER
+  MODERATOR
+  ADMIN
+}
+
+// ============================================
+// IMPORT-TRACKING
+// ============================================
+
+model ImportLog {
+  id           String   @id @default(cuid())
+  source       String   // "opentdb", "json_migration"
+  filename     String?  // Originaldatei
+  
+  questionsAdded   Int
+  questionsSkipped Int  // Duplikate
+  questionsFailed  Int  // Fehlerhafte
+  
+  details      Json?    // Zusätzliche Infos
+  
+  createdAt    DateTime @default(now())
+
+  @@map("import_logs")
 }

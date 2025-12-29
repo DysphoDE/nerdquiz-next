@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+opentdb_video_games.json
 
 # next.js
 /.next/

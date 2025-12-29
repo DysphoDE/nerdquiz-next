@@ -46,6 +46,8 @@ export interface Question {
   // For estimation
   unit?: string;
   correctValue?: number;
+  // Optional explanation shown after reveal
+  explanation?: string;
 }
 
 // ============================================

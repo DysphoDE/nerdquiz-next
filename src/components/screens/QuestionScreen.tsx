@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { Clock, Users, Zap, Check, X, Flame, Crown } from 'lucide-react';
+import { Clock, Users, Zap, Check, X, Flame, Crown, Info } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, usePlayers, useCurrentPlayer, useIsHost, useMyResult } from '@/store/gameStore';
 import { Card } from '@/components/ui/card';
@@ -455,6 +455,36 @@ export function QuestionScreen() {
               })}
             </motion.div>
 
+            {/* Explanation Box - shows immediately when correct answer is revealed */}
+            <AnimatePresence>
+              {showCorrect && question.explanation && (
+                <motion.div
+                  initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 25 }}
+                  className="mt-4 p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 backdrop-blur-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <motion.div 
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ delay: 0.3, type: 'spring', stiffness: 400 }}
+                      className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0"
+                    >
+                      <Info className="w-4 h-4 text-cyan-400" />
+                    </motion.div>
+                    <div>
+                      <p className="font-semibold text-cyan-400 text-sm mb-1">💡 Wusstest du?</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {question.explanation}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* My Result Banner */}
             <AnimatePresence>
               {(revealPhase === 'waiting' || revealPhase === 'returning') && myResult && (
@@ -463,7 +493,7 @@ export function QuestionScreen() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0 }}
                   className={cn(
-                    'mt-6 p-4 rounded-xl border text-center',
+                    'mt-4 p-4 rounded-xl border text-center',
                     myResult.correct ? 'border-green-500/50 bg-green-500/10' : 'border-red-500/30 bg-red-500/5'
                   )}
                 >

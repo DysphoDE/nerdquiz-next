@@ -9,7 +9,9 @@ import { Server as SocketServer } from 'socket.io';
 import next from 'next';
 import fs from 'fs';
 import path from 'path';
+import 'dotenv/config';
 import { botManager } from './src/server/botManager';
+import * as questionLoader from './src/server/questionLoader';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = dev ? 'localhost' : '0.0.0.0';
@@ -68,6 +70,7 @@ interface GameQuestion {
   unit?: string;
   category: string;
   categoryIcon: string;
+  explanation?: string;
 }
 
 type CategorySelectionMode = 'voting' | 'wheel' | 'losers_pick' | 'dice_royale' | 'rps_duel';
@@ -127,117 +130,20 @@ interface GameRoom {
 }
 
 // ============================================
-// CATEGORY LOADER
+// CATEGORY LOADER (uses questionLoader with DB/JSON fallback)
 // ============================================
 
-let categoriesCache: Map<string, CategoryData> | null = null;
-
-function loadCategories(): Map<string, CategoryData> {
-  if (categoriesCache) return categoriesCache;
-
-  const categoriesDir = path.join(process.cwd(), 'data', 'categories');
-  const categories = new Map<string, CategoryData>();
-
-  try {
-    if (fs.existsSync(categoriesDir)) {
-      const files = fs.readdirSync(categoriesDir);
-      
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-          const filePath = path.join(categoriesDir, file);
-          const content = fs.readFileSync(filePath, 'utf-8');
-          const data: CategoryData = JSON.parse(content);
-          const id = file.replace('.json', '');
-          categories.set(id, data);
-          console.log(`📚 Loaded: ${data.name} (${data.questions.length} questions)`);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error loading categories:', error);
-  }
-
-  categoriesCache = categories;
-  return categories;
+// Wrapper functions that use the questionLoader module
+async function getRandomCategoriesForVoting(count: number = 8): Promise<CategoryInfo[]> {
+  return questionLoader.getRandomCategoriesForVoting(count);
 }
 
-function getCategoryList(): CategoryInfo[] {
-  const categories = loadCategories();
-  const list: CategoryInfo[] = [];
-
-  categories.forEach((data, id) => {
-    list.push({
-      id,
-      name: data.name,
-      icon: data.icon,
-      questionCount: data.questions.length,
-    });
-  });
-
-  return list.sort((a, b) => a.name.localeCompare(b.name));
+async function getRandomQuestions(categoryId: string, count: number): Promise<GameQuestion[]> {
+  return questionLoader.getRandomQuestions(categoryId, count);
 }
 
-function getRandomQuestions(categoryId: string, count: number): GameQuestion[] {
-  const categories = loadCategories();
-  const category = categories.get(categoryId);
-
-  if (!category) {
-    console.log(`❌ Category not found: ${categoryId}`);
-    return [];
-  }
-
-  // Get all questions - some categories have estimationQuestions in a separate array
-  const allQuestions = [...category.questions];
-  if (category.estimationQuestions) {
-    allQuestions.push(...category.estimationQuestions);
-  }
-
-  // Separate choice and estimation questions
-  const choiceQuestions = allQuestions.filter(q => q.answers !== undefined && q.answers.length > 0);
-  const estimationQuestions = allQuestions.filter(q => q.correctAnswer !== undefined);
-  
-  console.log(`📊 Category ${category.name}: ${choiceQuestions.length} choice, ${estimationQuestions.length} estimation available`);
-  
-  // Shuffle both arrays
-  const shuffledChoice = [...choiceQuestions].sort(() => Math.random() - 0.5);
-  const shuffledEstimation = [...estimationQuestions].sort(() => Math.random() - 0.5);
-  
-  // Take (count - 1) choice questions, then 1 estimation question at the end
-  const selectedChoice = shuffledChoice.slice(0, count - 1);
-  const selectedEstimation = shuffledEstimation.slice(0, 1);
-  
-  // If no estimation questions available, just use choice questions
-  const selected = selectedEstimation.length > 0 
-    ? [...selectedChoice, ...selectedEstimation]
-    : shuffledChoice.slice(0, count);
-
-  console.log(`📝 Round: ${selectedChoice.length} choice + ${selectedEstimation.length} estimation = ${selected.length} total`);
-
-  return selected.map((q, i) => {
-    const isEstimation = q.correctAnswer !== undefined;
-    
-    const gameQ = {
-      id: `q_${Date.now()}_${i}`,
-      text: q.question,
-      type: isEstimation ? 'estimation' : 'choice',
-      answers: q.answers,
-      correctIndex: q.correct,
-      correctValue: q.correctAnswer,
-      unit: q.unit || '',
-      category: category.name,
-      categoryIcon: category.icon,
-    } as GameQuestion;
-    
-    console.log(`  ${i + 1}. [${gameQ.type}] ${gameQ.text.substring(0, 50)}...`);
-    
-    return gameQ;
-  });
-}
-
-function getRandomCategoriesForVoting(count: number = 6): CategoryInfo[] {
-  const allCategories = getCategoryList();
-  const shuffled = [...allCategories].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+async function getCategoryData(categoryId: string): Promise<{ name: string; icon: string } | null> {
+  return questionLoader.getCategoryData(categoryId);
 }
 
 // ============================================
@@ -299,10 +205,11 @@ function roomToClient(room: GameRoom) {
     unit: question.unit,
     category: question.category,
     categoryIcon: question.categoryIcon,
-    // Only send correct answer during reveal
+    // Only send correct answer and explanation during reveal
     ...(room.state.showingCorrectAnswer && {
       correctIndex: question.correctIndex,
       correctValue: question.correctValue,
+      explanation: question.explanation,
     }),
   } : null;
 
@@ -341,12 +248,14 @@ function roomToClient(room: GameRoom) {
 // START SERVER
 // ============================================
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
   const expressApp = express();
   const httpServer = createServer(expressApp);
   
-  const categories = loadCategories();
-  console.log(`\n📚 ${categories.size} Kategorien geladen\n`);
+  // Check database connection and load categories
+  const dbConnected = await questionLoader.isDatabaseConnected();
+  const categories = await questionLoader.getCategoryList();
+  console.log(`\n📚 ${categories.length} Kategorien geladen ${dbConnected ? '(Supabase)' : '(JSON Fallback)'}\n`);
 
   const io = new SocketServer(httpServer, {
     cors: {
@@ -868,7 +777,7 @@ app.prepare().then(() => {
     });
 
     // === DEV COMMANDS (Development only) ===
-    socket.on('dev_command', (data: { roomCode: string; playerId: string; command: string; params?: any }) => {
+    socket.on('dev_command', async (data: { roomCode: string; playerId: string; command: string; params?: any }) => {
       // Only allow in development
       if (process.env.NODE_ENV === 'production') return;
 
@@ -934,11 +843,11 @@ app.prepare().then(() => {
             startCategorySelection(room, io);
           }
           // Auto-select category if in voting phase
-          setTimeout(() => {
+          setTimeout(async () => {
             if (room.state.votingCategories.length > 0) {
               const randomCat = room.state.votingCategories[0];
               room.state.selectedCategory = randomCat.id;
-              room.state.roundQuestions = getRandomQuestions(randomCat.id, room.settings.questionsPerRound);
+              room.state.roundQuestions = await getRandomQuestions(randomCat.id, room.settings.questionsPerRound);
               room.state.currentQuestionIndex = 0;
               startQuestion(room, io);
             }
@@ -947,26 +856,19 @@ app.prepare().then(() => {
         }
 
         case 'skip_to_estimation': {
-          // Find an estimation question and show it
-          const categories = loadCategories();
-          for (const [catId, catData] of categories) {
-            const estQ = catData.questions.find(q => (q as any).correctAnswer !== undefined);
+          // Find an estimation question from the database
+          // For dev mode, just get any category and load an estimation question
+          const categories = await questionLoader.getCategoryList();
+          if (categories.length > 0) {
+            const questions = await getRandomQuestions(categories[0].id, 5);
+            const estQ = questions.find(q => q.type === 'estimation');
             if (estQ) {
-              room.state.currentQuestion = {
-                id: 'dev-est-' + Date.now(),
-                text: estQ.question,
-                type: 'estimation',
-                category: catData.name,
-                categoryIcon: catData.icon,
-                correctValue: (estQ as any).correctAnswer,
-                unit: (estQ as any).unit || '',
-              };
+              room.state.currentQuestion = estQ;
               room.state.phase = 'estimation';
               room.state.timerEnd = Date.now() + 30000;
               emitPhaseChange(room, io, 'estimation');
               io.to(room.code).emit('room_update', roomToClient(room));
               io.to(room.code).emit('dev_notification', { message: 'Schätzfrage geladen' });
-              break;
             }
           }
           break;
@@ -1104,11 +1006,11 @@ app.prepare().then(() => {
     return players[0] || null;
   }
 
-  function startCategorySelection(room: GameRoom, io: SocketServer) {
+  async function startCategorySelection(room: GameRoom, io: SocketServer) {
     const mode = selectCategoryMode(room);
     room.state.categorySelectionMode = mode;
     // 8 categories for wheel, but voting/loser's pick will use all of them too
-    room.state.votingCategories = getRandomCategoriesForVoting(8);
+    room.state.votingCategories = await getRandomCategoriesForVoting(8);
     room.state.categoryVotes = new Map();
     room.state.selectedCategory = null;
     room.state.loserPickPlayerId = null;
@@ -1388,12 +1290,12 @@ app.prepare().then(() => {
     }, 15000);
   }
 
-  function finalizeDiceRoyalePick(room: GameRoom, io: SocketServer, categoryId: string) {
+  async function finalizeDiceRoyalePick(room: GameRoom, io: SocketServer, categoryId: string) {
     room.state.selectedCategory = categoryId;
-    room.state.roundQuestions = getRandomQuestions(categoryId, room.settings.questionsPerRound);
+    room.state.roundQuestions = await getRandomQuestions(categoryId, room.settings.questionsPerRound);
     room.state.currentQuestionIndex = 0;
 
-    const categoryData = loadCategories().get(categoryId);
+    const categoryData = await getCategoryData(categoryId);
     const winner = room.state.diceRoyale?.winnerId ? room.players.get(room.state.diceRoyale.winnerId) : null;
     
     io.to(room.code).emit('category_selected', { 
@@ -1635,12 +1537,12 @@ app.prepare().then(() => {
     }, 15000);
   }
 
-  function finalizeRPSDuelPick(room: GameRoom, io: SocketServer, categoryId: string) {
+  async function finalizeRPSDuelPick(room: GameRoom, io: SocketServer, categoryId: string) {
     room.state.selectedCategory = categoryId;
-    room.state.roundQuestions = getRandomQuestions(categoryId, room.settings.questionsPerRound);
+    room.state.roundQuestions = await getRandomQuestions(categoryId, room.settings.questionsPerRound);
     room.state.currentQuestionIndex = 0;
 
-    const categoryData = loadCategories().get(categoryId);
+    const categoryData = await getCategoryData(categoryId);
     const winner = room.state.rpsDuel?.winnerId ? room.players.get(room.state.rpsDuel.winnerId) : null;
     
     io.to(room.code).emit('category_selected', { 
@@ -1659,13 +1561,13 @@ app.prepare().then(() => {
     }, 2500);
   }
 
-  function finalizeWheelSelection(room: GameRoom, io: SocketServer, categoryId: string) {
+  async function finalizeWheelSelection(room: GameRoom, io: SocketServer, categoryId: string) {
     room.state.selectedCategory = categoryId;
-    room.state.roundQuestions = getRandomQuestions(categoryId, room.settings.questionsPerRound);
+    room.state.roundQuestions = await getRandomQuestions(categoryId, room.settings.questionsPerRound);
     room.state.currentQuestionIndex = 0;
     room.state.wheelSelectedIndex = null; // Clear wheel index
 
-    const categoryData = loadCategories().get(categoryId);
+    const categoryData = await getCategoryData(categoryId);
     
     io.to(room.code).emit('category_selected', { 
       categoryId,
@@ -1678,12 +1580,12 @@ app.prepare().then(() => {
     }, 2000);
   }
 
-  function finalizeLosersPick(room: GameRoom, io: SocketServer, categoryId: string) {
+  async function finalizeLosersPick(room: GameRoom, io: SocketServer, categoryId: string) {
     room.state.selectedCategory = categoryId;
-    room.state.roundQuestions = getRandomQuestions(categoryId, room.settings.questionsPerRound);
+    room.state.roundQuestions = await getRandomQuestions(categoryId, room.settings.questionsPerRound);
     room.state.currentQuestionIndex = 0;
 
-    const categoryData = loadCategories().get(categoryId);
+    const categoryData = await getCategoryData(categoryId);
     
     io.to(room.code).emit('category_selected', { 
       categoryId,
@@ -1697,7 +1599,7 @@ app.prepare().then(() => {
     }, 2500);
   }
 
-  function finalizeCategoryVoting(room: GameRoom, io: SocketServer) {
+  async function finalizeCategoryVoting(room: GameRoom, io: SocketServer) {
     const voteCounts = new Map<string, number>();
     room.state.categoryVotes.forEach((catId) => {
       voteCounts.set(catId, (voteCounts.get(catId) || 0) + 1);
@@ -1722,10 +1624,10 @@ app.prepare().then(() => {
       : room.state.votingCategories[Math.floor(Math.random() * room.state.votingCategories.length)]?.id;
 
     room.state.selectedCategory = selectedCategoryId;
-    room.state.roundQuestions = getRandomQuestions(selectedCategoryId, room.settings.questionsPerRound);
+    room.state.roundQuestions = await getRandomQuestions(selectedCategoryId, room.settings.questionsPerRound);
     room.state.currentQuestionIndex = 0;
 
-    const categoryData = loadCategories().get(selectedCategoryId);
+    const categoryData = await getCategoryData(selectedCategoryId);
     
     // If there's a tie, send tiebreaker event first with roulette animation
     const isTie = winners.length > 1;
