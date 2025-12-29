@@ -91,11 +91,14 @@ export default function EditQuestionPage() {
         
         // Populate type-specific content
         const content = questionData.content;
+        
         if (questionData.type === 'MULTIPLE_CHOICE' && content) {
           setCorrectAnswer(content.correctAnswer || '');
           setIncorrectAnswers(content.incorrectAnswers || ['', '', '']);
         } else if (questionData.type === 'ESTIMATION' && content) {
-          setCorrectValue(String(content.correctValue || ''));
+          // Support both 'correctValue' (new) and 'value' (legacy) field names
+          const value = content.correctValue ?? content.value ?? '';
+          setCorrectValue(String(value));
           setUnit(content.unit || '');
         } else if (questionData.type === 'TRUE_FALSE' && content) {
           setTrueFalseAnswer(content.correctAnswer ?? true);

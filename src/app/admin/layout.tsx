@@ -14,6 +14,7 @@ import {
   Gamepad2,
   BarChart3,
   LogOut,
+  HeartPulse,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,11 @@ const navItems: NavItem[] = [
     href: '/admin/stats', 
     label: 'Statistiken', 
     icon: <BarChart3 className="w-5 h-5" /> 
+  },
+  { 
+    href: '/admin/health', 
+    label: 'Datenqualität', 
+    icon: <HeartPulse className="w-5 h-5" /> 
   },
 ];
 
