@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "dev:next": "next dev",
-    "build": "next build && tsup server.ts --format cjs --out-dir dist",
+    "build": "prisma generate && next build && tsup server.ts --format cjs --out-dir dist",
     "start": "NODE_ENV=production node dist/server.js",
     "lint": "eslint",
     "db:generate": "prisma generate",

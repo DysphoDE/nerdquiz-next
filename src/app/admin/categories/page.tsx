@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+// Force dynamic rendering (no static generation during build)
+export const dynamic = 'force-dynamic';
+
 async function getCategories() {
   const categories = await prisma.category.findMany({
     orderBy: { sortOrder: 'asc' },

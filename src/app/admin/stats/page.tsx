@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 
+// Force dynamic rendering (no static generation during build)
+export const dynamic = 'force-dynamic';
+
 async function getStats() {
   const now = new Date();
   const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -19,7 +22,6 @@ async function getStats() {
     gamesLast7Days,
     gamesLast30Days,
     totalPlayers,
-    avgPlayersPerGame,
     topCategories,
     recentGames,
   ] = await Promise.all([
@@ -31,11 +33,6 @@ async function getStats() {
       where: { createdAt: { gte: last30Days } },
     }),
     prisma.playerResult.count(),
-    prisma.gameSession.count() > 0
-      ? prisma.playerResult.count().then(
-          (total) => total / Math.max(1, prisma.gameSession.count() as unknown as number)
-        )
-      : 0,
     prisma.question.groupBy({
       by: ['categoryId'],
       _sum: { timesPlayed: true },

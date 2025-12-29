@@ -21,6 +21,9 @@ import {
 } from '@/lib/validations/questions';
 import { QuestionFilters } from '@/components/admin/QuestionFilters';
 
+// Force dynamic rendering (no static generation during build)
+export const dynamic = 'force-dynamic';
+
 interface SearchParams {
   category?: string;
   type?: QuestionType;

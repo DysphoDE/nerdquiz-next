@@ -11,6 +11,9 @@ import {
 import { prisma } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
 
+// Force dynamic rendering (no static generation during build)
+export const dynamic = 'force-dynamic';
+
 async function getImportLogs() {
   return prisma.importLog.findMany({
     orderBy: { createdAt: 'desc' },

@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 
+// Force dynamic rendering (no static generation during build)
+export const dynamic = 'force-dynamic';
+
 async function getStats() {
   const [
     categoryCount,
