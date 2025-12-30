@@ -32,6 +32,7 @@ export function BonusRoundScreen() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [lastResult, setLastResult] = useState<'correct' | 'wrong' | 'already_guessed' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastTurnNumberRef = useRef<number | null>(null);
 
   const bonusRound = room?.bonusRound as BonusRoundState | null;
   const isMyTurn = bonusRound?.currentTurn?.playerId === playerId;
@@ -53,12 +54,17 @@ export function BonusRoundScreen() {
     return () => clearInterval(interval);
   }, [bonusRound?.currentTurn?.timerEnd, isPlaying]);
 
-  // Auto-focus input when it's my turn
+  // Auto-focus input when it's my turn (only on actual turn change)
   useEffect(() => {
-    if (isMyTurn && inputRef.current) {
-      inputRef.current.focus();
+    const currentTurnNumber = bonusRound?.currentTurn?.turnNumber ?? null;
+    
+    // Only reset if it's a NEW turn (turn number actually changed)
+    if (isMyTurn && currentTurnNumber !== null && currentTurnNumber !== lastTurnNumberRef.current) {
+      lastTurnNumberRef.current = currentTurnNumber;
       setInputValue('');
       setLastResult(null);
+      // Focus with slight delay to ensure input is mounted
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isMyTurn, bonusRound?.currentTurn?.turnNumber]);
 
