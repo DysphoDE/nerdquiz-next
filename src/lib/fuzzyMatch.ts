@@ -11,7 +11,7 @@ import { distance } from 'fastest-levenshtein';
  * - Kleinschreibung
  * - Trimmen
  * - Umlaute vereinheitlichen
- * - Sonderzeichen entfernen
+ * - Die meisten Sonderzeichen entfernen (aber #, + behalten für C#, C++ etc.)
  */
 export function normalizeString(str: string): string {
   return str
@@ -25,8 +25,9 @@ export function normalizeString(str: string): string {
     // Unicode-Normalisierung (Akzente entfernen)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    // Nur alphanumerische Zeichen und Leerzeichen
-    .replace(/[^a-z0-9\s]/g, '')
+    // Alphanumerische Zeichen, Leerzeichen, # und + behalten
+    // (wichtig für Programmiersprachen wie C#, C++, F#)
+    .replace(/[^a-z0-9\s#+]/g, '')
     // Mehrfache Leerzeichen zusammenfassen
     .replace(/\s+/g, ' ');
 }
@@ -71,11 +72,36 @@ export interface CollectiveListItem {
 }
 
 /**
+ * Mindestlänge für Fuzzy-Matching.
+ * Bei kürzeren Strings wird nur exakt gematcht, da Fuzzy bei
+ * kurzen Strings wie "C", "R", "Go" zu Fehlerkennungen führt.
+ */
+const MIN_LENGTH_FOR_FUZZY = 4;
+
+/**
+ * Prüft ob Fuzzy-Matching für zwei Strings sinnvoll ist.
+ * Bei sehr kurzen Strings (wie Programmiersprachen "C", "R", "Go")
+ * führt Fuzzy-Matching zu falschen Matches.
+ */
+function shouldAllowFuzzy(input: string, target: string): boolean {
+  const normInput = normalizeString(input);
+  const normTarget = normalizeString(target);
+  
+  // Beide Strings müssen mindestens MIN_LENGTH_FOR_FUZZY Zeichen haben
+  // um Fuzzy-Matching zu erlauben
+  return normInput.length >= MIN_LENGTH_FOR_FUZZY && 
+         normTarget.length >= MIN_LENGTH_FOR_FUZZY;
+}
+
+/**
  * Prüft ob eine Eingabe zu einem Item passt
  * Berücksichtigt:
  * 1. Exakte Übereinstimmung mit Display-Name
  * 2. Exakte Übereinstimmung mit Aliases
- * 3. Fuzzy-Match mit Threshold
+ * 3. Fuzzy-Match mit Threshold (nur bei Strings >= 4 Zeichen)
+ * 
+ * WICHTIG: Bei kurzen Strings (< 4 Zeichen) wird nur exakt gematcht,
+ * um Verwechslungen wie "C" vs "C#" vs "C++" zu vermeiden.
  */
 export function checkAnswer(
   input: string,
@@ -96,7 +122,7 @@ export function checkAnswer(
     };
   }
 
-  // Zuerst exakte Matches prüfen
+  // Zuerst exakte Matches prüfen (immer, unabhängig von Länge)
   for (const item of items) {
     // Prüfe Display-Name
     if (normalizeString(item.display) === normalizedInput) {
@@ -125,24 +151,28 @@ export function checkAnswer(
     }
   }
 
-  // Dann Fuzzy-Matches prüfen
+  // Dann Fuzzy-Matches prüfen (nur bei ausreichend langen Strings)
   let bestMatch: { item: CollectiveListItem; confidence: number } | null = null;
 
   for (const item of items) {
-    // Prüfe Display-Name mit Fuzzy
-    const displaySimilarity = similarity(input, item.display);
-    if (displaySimilarity >= fuzzyThreshold) {
-      if (!bestMatch || displaySimilarity > bestMatch.confidence) {
-        bestMatch = { item, confidence: displaySimilarity };
+    // Prüfe Display-Name mit Fuzzy (nur wenn beide Strings lang genug sind)
+    if (shouldAllowFuzzy(input, item.display)) {
+      const displaySimilarity = similarity(input, item.display);
+      if (displaySimilarity >= fuzzyThreshold) {
+        if (!bestMatch || displaySimilarity > bestMatch.confidence) {
+          bestMatch = { item, confidence: displaySimilarity };
+        }
       }
     }
     
     // Prüfe alle Aliases mit Fuzzy
     for (const alias of item.aliases) {
-      const aliasSimilarity = similarity(input, alias);
-      if (aliasSimilarity >= fuzzyThreshold) {
-        if (!bestMatch || aliasSimilarity > bestMatch.confidence) {
-          bestMatch = { item, confidence: aliasSimilarity };
+      if (shouldAllowFuzzy(input, alias)) {
+        const aliasSimilarity = similarity(input, alias);
+        if (aliasSimilarity >= fuzzyThreshold) {
+          if (!bestMatch || aliasSimilarity > bestMatch.confidence) {
+            bestMatch = { item, confidence: aliasSimilarity };
+          }
         }
       }
     }
@@ -169,5 +199,6 @@ export function checkAnswer(
     alreadyGuessed: false,
   };
 }
+
 
 

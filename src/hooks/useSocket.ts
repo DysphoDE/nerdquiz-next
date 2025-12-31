@@ -78,6 +78,21 @@ export function useSocket() {
       setBonusRoundResult(data);
     };
 
+    const handleKickedFromRoom = (data: { reason: string }) => {
+      console.log('👋 Kicked from room:', data.reason);
+      clearSession();
+      reset();
+      // Redirect will happen via the component that detects null room
+    };
+
+    const handleRematchResult = (data: { rematch: boolean; newHostId?: string; newHostName?: string }) => {
+      console.log('🔄 Rematch result:', data);
+      if (data.rematch) {
+        // Scores etc. are reset server-side, room_update will refresh the UI
+        console.log(`🔄 Rematch starting! New host: ${data.newHostName}`);
+      }
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('room_update', handleRoomUpdate);
@@ -90,6 +105,8 @@ export function useSocket() {
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('player_answered', handlePlayerAnswered);
     socket.on('bonus_round_end', handleBonusRoundEnd);
+    socket.on('kicked_from_room', handleKickedFromRoom);
+    socket.on('rematch_result', handleRematchResult);
 
     // Connect if not already connected
     if (!socket.connected) {
@@ -111,8 +128,10 @@ export function useSocket() {
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('player_answered', handlePlayerAnswered);
       socket.off('bonus_round_end', handleBonusRoundEnd);
+      socket.off('kicked_from_room', handleKickedFromRoom);
+      socket.off('rematch_result', handleRematchResult);
     };
-  }, [setConnected, setRoom, setLastResults, setFinalRankings, setBonusRoundResult, resetQuestion]);
+  }, [setConnected, setRoom, setLastResults, setFinalRankings, setBonusRoundResult, resetQuestion, reset]);
 
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store

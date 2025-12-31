@@ -951,6 +951,18 @@ app.prepare().then(async () => {
       
       console.log(`🗳️ ${player.name} voted ${data.vote} for rematch`);
       
+      // Wenn "Nein" gestimmt wurde, Spieler sofort aus dem Raum entfernen
+      if (data.vote === 'no') {
+        // Benachrichtige den Spieler und entferne ihn
+        socket.emit('kicked_from_room', { reason: 'Du hast gegen eine weitere Runde gestimmt.' });
+        socket.leave(room.code);
+        
+        // Markiere als disconnected (wird bei finalizeRematchVoting entfernt)
+        player.isConnected = false;
+        
+        console.log(`👋 ${player.name} left after voting no`);
+      }
+      
       io.to(room.code).emit('rematch_vote_update', {
         playerId: data.playerId,
         playerName: player.name,

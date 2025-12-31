@@ -83,6 +83,16 @@ export default function RoomPage() {
     }
   }, [roomCode, isConnected, room, reconnectPlayer]);
 
+  // Redirect to home if player was kicked (room becomes null while connected)
+  useEffect(() => {
+    const session = loadSession();
+    // If we were connected but room is now null and no session exists, redirect
+    if (isConnected && connectionState === 'connected' && !room && !session) {
+      console.log('🚪 Kicked from room, redirecting to home');
+      router.push('/');
+    }
+  }, [isConnected, room, connectionState, router]);
+
   // Handle join
   const handleJoin = async () => {
     if (!playerName.trim()) {
