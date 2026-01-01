@@ -41,6 +41,8 @@ interface CategoryInfo {
   questionCount: number;
 }
 
+type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
 interface GameQuestion {
   id: string;
   text: string;
@@ -51,6 +53,8 @@ interface GameQuestion {
   unit?: string;
   category: string;
   categoryIcon: string;
+  // Difficulty for dev-mode quick editing
+  difficulty?: Difficulty;
 }
 
 // ============================================
@@ -210,10 +214,11 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
 
   // Get questions with random ordering
   // PostgreSQL random ordering
+  // NOTE: TRUE_FALSE questions are excluded until properly implemented
   let choiceQuestions = await prisma.question.findMany({
     where: {
       ...baseFilter,
-      type: { in: ['MULTIPLE_CHOICE', 'TRUE_FALSE'] },
+      type: 'MULTIPLE_CHOICE', // Only MULTIPLE_CHOICE for now (TRUE_FALSE not yet implemented)
     },
     orderBy: {
       // Use raw SQL for random - this is a workaround
@@ -237,7 +242,7 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
       where: {
         categoryId: category.id,
         isActive: true,
-        type: { in: ['MULTIPLE_CHOICE', 'TRUE_FALSE'] },
+        type: 'MULTIPLE_CHOICE', // Only MULTIPLE_CHOICE for now
       },
       take: count * 2,
     });
@@ -274,6 +279,9 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
     const content = q.content as any;
     const isEstimation = q.type === 'ESTIMATION';
     
+    // Map DB difficulty enum to our type
+    const difficulty = q.difficulty as Difficulty;
+    
     if (isEstimation && isEstimationContent(content)) {
       return {
         id: q.id,
@@ -284,6 +292,7 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
         category: category.name,
         categoryIcon: category.icon,
         explanation: q.explanation || undefined,
+        difficulty,
       };
     }
     
@@ -302,6 +311,7 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
         category: category.name,
         categoryIcon: category.icon,
         explanation: q.explanation || undefined,
+        difficulty,
       };
     }
 
@@ -315,6 +325,7 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
       category: category.name,
       categoryIcon: category.icon,
       explanation: q.explanation || undefined,
+      difficulty,
     };
   });
 }

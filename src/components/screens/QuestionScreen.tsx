@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { Clock, Users, Zap, Check, X, Flame, Crown, Info } from 'lucide-react';
+import { Clock, Users, Zap, Check, X, Flame, Crown, Info, Gauge, Loader2 } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, usePlayers, useCurrentPlayer, useIsHost, useMyResult } from '@/store/gameStore';
+import { useDevMode } from '@/hooks/useDevMode';
 import { Card } from '@/components/ui/card';
 import { GameAvatar, getMoodForContext, type AvatarMood } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import type { AnswerResult, Player } from '@/types/game';
+import type { AnswerResult, Player, Difficulty } from '@/types/game';
 
 const ANSWER_COLORS = [
   { gradient: 'from-red-500 to-red-600', border: 'border-red-500', bg: 'bg-red-500/20', text: 'text-red-400' },
@@ -34,6 +35,7 @@ export function QuestionScreen() {
   const currentPlayer = useCurrentPlayer();
   const isHost = useIsHost();
   const myResult = useMyResult();
+  const { isDevMode } = useDevMode();
   
   const [timeLeft, setTimeLeft] = useState(0);
   const [revealPhase, setRevealPhase] = useState<RevealPhase>('answering');
@@ -274,6 +276,14 @@ export function QuestionScreen() {
                   </p>
                   <p className="text-sm text-primary font-bold">{question.category}</p>
                 </div>
+                {/* Dev-Mode Difficulty Editor - nur für Host */}
+                {isDevMode && isHost && question.id && (
+                  <DifficultyEditor 
+                    key={question.id} // Force remount on new question
+                    questionId={question.id} 
+                    currentDifficulty={question.difficulty} 
+                  />
+                )}
               </div>
               {!isRevealing && (
                 <div className="flex items-center gap-3">
@@ -968,6 +978,145 @@ function MobileLeaderboard({
             </motion.div>
           );
         })}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ============================================
+// DEV-MODE: DIFFICULTY EDITOR
+// ============================================
+
+const DIFFICULTY_CONFIG: Record<Difficulty, { label: string; emoji: string; color: string; bgColor: string }> = {
+  EASY: { label: 'Leicht', emoji: '🟢', color: 'text-green-400', bgColor: 'bg-green-500/20 border-green-500/30' },
+  MEDIUM: { label: 'Mittel', emoji: '🟡', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20 border-yellow-500/30' },
+  HARD: { label: 'Schwer', emoji: '🔴', color: 'text-red-400', bgColor: 'bg-red-500/20 border-red-500/30' },
+};
+
+function DifficultyEditor({ 
+  questionId, 
+  currentDifficulty 
+}: { 
+  questionId: string; 
+  currentDifficulty?: Difficulty;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty | undefined>(currentDifficulty);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setDifficulty(currentDifficulty);
+  }, [currentDifficulty]);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const updateDifficulty = async (newDifficulty: Difficulty) => {
+    if (isUpdating || newDifficulty === difficulty) return;
+    
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/admin/questions/${questionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty: newDifficulty }),
+      });
+
+      if (response.ok) {
+        setDifficulty(newDifficulty);
+        console.log(`✅ Difficulty updated to ${newDifficulty}`);
+      } else {
+        console.error('❌ Failed to update difficulty');
+      }
+    } catch (error) {
+      console.error('❌ Error updating difficulty:', error);
+    } finally {
+      setIsUpdating(false);
+      setIsOpen(false);
+    }
+  };
+
+  const config = difficulty ? DIFFICULTY_CONFIG[difficulty] : null;
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      {/* Trigger Button */}
+      <motion.button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          'flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-medium transition-colors',
+          config ? config.bgColor : 'bg-muted/50 border-muted-foreground/30',
+          'hover:opacity-80'
+        )}
+        whileTap={{ scale: 0.95 }}
+        title="Schwierigkeit ändern (Dev)"
+      >
+        <Gauge className="w-3.5 h-3.5" />
+        {config ? (
+          <>
+            <span>{config.emoji}</span>
+            <span className={config.color}>{config.label}</span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">?</span>
+        )}
+      </motion.button>
+
+      {/* Popover */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.95 }}
+            className="absolute top-full left-0 mt-2 z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-2 min-w-[160px]"
+          >
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider px-2 py-1 mb-1">
+              Schwierigkeit setzen
+            </p>
+            {(Object.entries(DIFFICULTY_CONFIG) as [Difficulty, typeof DIFFICULTY_CONFIG.EASY][]).map(
+              ([key, cfg]) => (
+                <button
+                  key={key}
+                  onClick={() => updateDifficulty(key)}
+                  disabled={isUpdating}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    difficulty === key 
+                      ? cfg.bgColor + ' ring-1 ring-inset ring-current'
+                      : 'hover:bg-zinc-800',
+                    isUpdating && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <span>{cfg.emoji}</span>
+                  <span className={cfg.color}>{cfg.label}</span>
+                  {difficulty === key && !isUpdating && (
+                    <Check className={cn('w-4 h-4 ml-auto', cfg.color)} />
+                  )}
+                  {isUpdating && difficulty !== key && key === difficulty && (
+                    <Loader2 className="w-4 h-4 ml-auto animate-spin" />
+                  )}
+                </button>
+              )
+            )}
+            <div className="mt-2 pt-2 border-t border-zinc-700">
+              <p className="text-[9px] text-muted-foreground px-2">
+                ID: {questionId.slice(0, 8)}...
+              </p>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

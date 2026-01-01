@@ -62,6 +62,8 @@ export interface Player {
 // GAME QUESTION
 // ============================================
 
+export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+
 export interface GameQuestion {
   id: string;
   text: string;
@@ -73,6 +75,8 @@ export interface GameQuestion {
   category: string;
   categoryIcon: string;
   explanation?: string;
+  // Difficulty for dev-mode quick editing
+  difficulty?: Difficulty;
 }
 
 // ============================================

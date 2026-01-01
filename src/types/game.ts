@@ -37,6 +37,7 @@ export interface Category {
 // ============================================
 
 export type QuestionType = 'choice' | 'estimation';
+export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 export interface Question {
   id: string;
@@ -52,6 +53,8 @@ export interface Question {
   correctValue?: number;
   // Optional explanation shown after reveal
   explanation?: string;
+  // Difficulty level (only used in dev mode for quick editing)
+  difficulty?: Difficulty;
 }
 
 // ============================================

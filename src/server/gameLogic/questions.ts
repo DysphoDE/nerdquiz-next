@@ -63,8 +63,30 @@ function updateCategoryStats(
 /**
  * Startet die nächste Frage
  */
-export function startQuestion(room: GameRoom, io: SocketServer): void {
-  const question = room.state.roundQuestions[room.state.currentQuestionIndex];
+export async function startQuestion(room: GameRoom, io: SocketServer): Promise<void> {
+  let question = room.state.roundQuestions[room.state.currentQuestionIndex];
+  
+  // Check if we need to load more questions (Endless Mode)
+  const isEndlessMode = (room as any).isEndlessMode === true;
+  const endlessCategoryId = (room as any).endlessCategoryId as string | undefined;
+  
+  if (!question && isEndlessMode && endlessCategoryId) {
+    // Load more questions for endless mode
+    const { getQuestionsForRoom } = await import('./categorySelection');
+    console.log('♾️ Endless mode: Loading more questions...');
+    
+    const newQuestions = await getQuestionsForRoom(room, endlessCategoryId, 50);
+    if (newQuestions.length > 0) {
+      room.state.roundQuestions = newQuestions;
+      room.state.currentQuestionIndex = 0;
+      question = newQuestions[0];
+      
+      io.to(room.code).emit('dev_notification', { 
+        message: `♾️ ${newQuestions.length} neue Fragen geladen` 
+      });
+    }
+  }
+  
   if (!question) {
     // No more questions - show scoreboard
     const { showScoreboard } = require('./matchFlow');

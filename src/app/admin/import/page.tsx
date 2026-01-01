@@ -75,6 +75,9 @@ export default function ImportPage() {
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState<string | null>(null);
+  const [isBulkTranslating, setIsBulkTranslating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; translated: number } | null>(null);
+  const bulkAbortRef = useRef(false);
   
   // Import State
   const [categories, setCategories] = useState<Category[]>([]);
@@ -340,6 +343,109 @@ export default function ImportPage() {
     } finally {
       setIsTranslating(false);
     }
+  };
+
+  // Bulk Translation - translate all pages one by one
+  const handleBulkTranslate = async () => {
+    if (!apiKey) {
+      setShowApiKeyInput(true);
+      return;
+    }
+
+    // Save API key
+    localStorage.setItem('openai_api_key', apiKey);
+
+    // Get all selected questions that aren't yet translated
+    const untranslatedSelectedIndices = Array.from(selectedIndices).filter(i => !questions[i]._translated);
+    
+    if (untranslatedSelectedIndices.length === 0) {
+      setError('Alle ausgewählten Fragen sind bereits übersetzt');
+      return;
+    }
+
+    setIsBulkTranslating(true);
+    bulkAbortRef.current = false;
+    setError(null);
+    
+    // Process in batches of batchSize
+    const batches: number[][] = [];
+    for (let i = 0; i < untranslatedSelectedIndices.length; i += batchSize) {
+      batches.push(untranslatedSelectedIndices.slice(i, i + batchSize));
+    }
+    
+    let totalTranslated = 0;
+    let totalTokens = 0;
+    
+    setBulkProgress({ current: 0, total: batches.length, translated: 0 });
+    
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      // Check for abort
+      if (bulkAbortRef.current) {
+        setBulkProgress(null);
+        setTranslationProgress(`⚠️ Abgebrochen nach ${totalTranslated} Fragen`);
+        setTimeout(() => setTranslationProgress(null), 5000);
+        setIsBulkTranslating(false);
+        return;
+      }
+      
+      const batchIndices = batches[batchIndex];
+      setBulkProgress({ current: batchIndex + 1, total: batches.length, translated: totalTranslated });
+      
+      try {
+        const questionsToTranslate = batchIndices.map(i => questions[i]);
+        
+        const response = await fetch('/api/admin/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questions: questionsToTranslate,
+            apiKey,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Übersetzungsfehler');
+        }
+
+        // Update questions with translations
+        setQuestions(prev => {
+          const next = [...prev];
+          batchIndices.forEach((globalIndex, localIndex) => {
+            if (data.questions[localIndex]) {
+              next[globalIndex] = {
+                ...next[globalIndex],
+                ...data.questions[localIndex],
+              };
+            }
+          });
+          return next;
+        });
+
+        totalTranslated += batchIndices.length;
+        totalTokens += data.usage?.total_tokens || 0;
+        
+        // Small delay between batches to avoid rate limiting
+        if (batchIndex < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (e) {
+        setError(`Fehler bei Batch ${batchIndex + 1}: ` + (e instanceof Error ? e.message : 'Unbekannter Fehler'));
+        setBulkProgress(null);
+        setIsBulkTranslating(false);
+        return;
+      }
+    }
+    
+    setBulkProgress(null);
+    setTranslationProgress(`✓ Alle ${totalTranslated} Fragen übersetzt (${totalTokens.toLocaleString()} Tokens)`);
+    setTimeout(() => setTranslationProgress(null), 8000);
+    setIsBulkTranslating(false);
+  };
+
+  const handleAbortBulkTranslate = () => {
+    bulkAbortRef.current = true;
   };
 
   // Import
@@ -618,10 +724,10 @@ export default function ImportPage() {
 
             {/* Right: Actions */}
             <div className="flex items-center gap-3">
-              {/* Translate Button */}
+              {/* Translate Page Button */}
               <button
                 onClick={handleTranslate}
-                disabled={isTranslating || selectedOnPageCount === 0}
+                disabled={isTranslating || isBulkTranslating || selectedOnPageCount === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isTranslating ? (
@@ -631,11 +737,32 @@ export default function ImportPage() {
                 )}
                 Seite übersetzen ({selectedOnPageCount})
               </button>
+              
+              {/* Bulk Translate All Button */}
+              {isBulkTranslating ? (
+                <button
+                  onClick={handleAbortBulkTranslate}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Abbrechen
+                </button>
+              ) : (
+                <button
+                  onClick={handleBulkTranslate}
+                  disabled={isTranslating || selectedCount === 0 || translatedCount === selectedCount}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Alle ausgewählten Fragen übersetzen (in Batches)"
+                >
+                  <Languages className="w-4 h-4" />
+                  Alle übersetzen ({selectedCount - translatedCount})
+                </button>
+              )}
             </div>
           </div>
 
           {/* Translation Progress */}
-          {translationProgress && (
+          {translationProgress && !bulkProgress && (
             <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 flex items-center gap-3">
               {isTranslating ? (
                 <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
@@ -643,6 +770,32 @@ export default function ImportPage() {
                 <CheckCircle2 className="w-5 h-5 text-purple-400" />
               )}
               <span className="text-purple-300">{translationProgress}</span>
+            </div>
+          )}
+          
+          {/* Bulk Translation Progress */}
+          {bulkProgress && (
+            <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                  <span className="text-purple-300 font-medium">
+                    Bulk-Übersetzung läuft...
+                  </span>
+                </div>
+                <span className="text-purple-400 text-sm">
+                  Batch {bulkProgress.current} / {bulkProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 h-full transition-all duration-300"
+                  style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                {bulkProgress.translated} Fragen übersetzt, {(bulkProgress.total - bulkProgress.current) * batchSize} verbleibend
+              </p>
             </div>
           )}
 

@@ -547,6 +547,47 @@ function handleDevCommand(io: SocketServer) {
         }
         break;
       }
+
+      case 'start_endless_round': {
+        // Endlosrunde: Lädt immer wieder neue Fragen aus einer Kategorie
+        const categorySlug = data.params?.categoryId;
+        if (!categorySlug) {
+          io.to(room.code).emit('dev_notification', { message: 'Keine Kategorie ausgewählt!' });
+          break;
+        }
+
+        // Set high round limit for "endless" mode
+        room.settings.maxRounds = 999;
+        room.settings.questionsPerRound = 999;
+        room.state.currentRound = 1;
+        room.state.currentQuestionIndex = 0;
+        
+        // Clear used questions to get fresh pool
+        room.state.usedQuestionIds.clear();
+        
+        // Load questions from selected category
+        const questions = await getQuestionsForRoom(room, categorySlug, 50);
+        if (questions.length === 0) {
+          io.to(room.code).emit('dev_notification', { message: `Keine Fragen in Kategorie "${categorySlug}" gefunden!` });
+          break;
+        }
+
+        room.state.roundQuestions = questions;
+        room.state.selectedCategory = categorySlug;
+        
+        // Mark room as endless mode (can be used for UI)
+        (room as any).isEndlessMode = true;
+        (room as any).endlessCategoryId = categorySlug;
+
+        // Start first question
+        startQuestion(room, io);
+        
+        const categoryName = questions[0]?.category || categorySlug;
+        io.to(room.code).emit('dev_notification', { 
+          message: `♾️ Endlosrunde gestartet: ${categoryName} (${questions.length} Fragen)` 
+        });
+        break;
+      }
     }
   };
 }

@@ -216,6 +216,8 @@ export function roomToClient(room: GameRoom): Record<string, any> {
     unit: question.unit,
     category: question.category,
     categoryIcon: question.categoryIcon,
+    // Difficulty is always sent (for dev-mode editing)
+    difficulty: question.difficulty,
     // Only send correct answer and explanation during reveal
     ...(room.state.showingCorrectAnswer && {
       correctIndex: question.correctIndex,

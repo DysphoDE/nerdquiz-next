@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bug, 
@@ -16,23 +16,54 @@ import {
   Dices,
   Swords,
   ListChecks,
+  Infinity,
+  Loader2,
 } from 'lucide-react';
 import { getSocket } from '@/lib/socket';
 import { useGameStore } from '@/store/gameStore';
+import { useDevMode } from '@/hooks/useDevMode';
 
-// Only show in development
-const isDev = process.env.NODE_ENV === 'development';
+// Category type for endless mode
+interface DevCategory {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string;
+  _count?: { questions: number };
+}
 
 export function DevPanel() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(true);
+  const [categories, setCategories] = useState<DevCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [selectedEndlessCategory, setSelectedEndlessCategory] = useState<string>('');
+  const [showEndlessDropdown, setShowEndlessDropdown] = useState(false);
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
+  const { isDevMode } = useDevMode();
 
-  if (!isDev) return null;
+  // Don't render if dev mode is not enabled
+  if (!isDevMode) return null;
 
   const socket = getSocket();
   const roomCode = room?.code;
+
+  // Load categories when endless dropdown is opened
+  useEffect(() => {
+    if (showEndlessDropdown && categories.length === 0 && !loadingCategories) {
+      setLoadingCategories(true);
+      fetch('/api/admin/categories')
+        .then(res => res.json())
+        .then((data: DevCategory[]) => {
+          setCategories(data.filter(c => (c._count?.questions || 0) > 0));
+          if (data.length > 0) {
+            setSelectedEndlessCategory(data[0].slug);
+          }
+        })
+        .catch(err => console.error('Failed to load categories:', err))
+        .finally(() => setLoadingCategories(false));
+    }
+  }, [showEndlessDropdown, categories.length, loadingCategories]);
 
   // Dev commands
   const devCommand = (command: string, params?: any) => {
@@ -53,6 +84,11 @@ export function DevPanel() {
   const skipToFinal = () => devCommand('skip_to_final');
   const setRandomScores = () => devCommand('randomize_scores');
   const startBonusRound = () => devCommand('start_bonus_round');
+  const startEndlessRound = () => {
+    if (!selectedEndlessCategory) return;
+    devCommand('start_endless_round', { categoryId: selectedEndlessCategory });
+    setShowEndlessDropdown(false);
+  };
 
   if (!room) return null;
 
@@ -69,7 +105,7 @@ export function DevPanel() {
         <Bug className="w-5 h-5" />
       </motion.button>
 
-      {/* Panel */}
+      {/* Panel - opens directly when button is clicked */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -79,10 +115,7 @@ export function DevPanel() {
             className="fixed bottom-20 right-4 z-[100] w-80 bg-zinc-900 border border-yellow-500/50 rounded-xl shadow-2xl overflow-hidden"
           >
             {/* Header */}
-            <div 
-              className="flex items-center justify-between px-4 py-3 bg-yellow-500/20 border-b border-yellow-500/30 cursor-pointer"
-              onClick={() => setIsMinimized(!isMinimized)}
-            >
+            <div className="flex items-center justify-between px-4 py-3 bg-yellow-500/20 border-b border-yellow-500/30">
               <div className="flex items-center gap-2">
                 <Bug className="w-4 h-4 text-yellow-500" />
                 <span className="font-bold text-yellow-500">Dev Panel</span>
@@ -91,24 +124,17 @@ export function DevPanel() {
                 <span className="text-xs text-yellow-500/70">
                   {room.code} | {room.phase}
                 </span>
-                {isMinimized ? (
-                  <ChevronUp className="w-4 h-4 text-yellow-500" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-yellow-500" />
-                )}
+                <button 
+                  onClick={() => setIsOpen(false)}
+                  className="text-yellow-500 hover:text-yellow-300 transition-colors"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* Content */}
-            <AnimatePresence>
-              {!isMinimized && (
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: 'auto' }}
-                  exit={{ height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Content - always visible when panel is open */}
+            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
                     
                     {/* Current State */}
                     <div className="text-xs space-y-1 p-2 bg-zinc-800 rounded-lg">
@@ -180,6 +206,63 @@ export function DevPanel() {
                       </div>
                     </div>
 
+                    {/* Endless Round */}
+                    <div>
+                      <h4 className="text-xs text-zinc-400 mb-2 uppercase tracking-wider">
+                        Endlosrunde (zum Testen)
+                      </h4>
+                      <div className="space-y-2">
+                        {!showEndlessDropdown ? (
+                          <button
+                            onClick={() => setShowEndlessDropdown(true)}
+                            className="w-full flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 border-violet-500/30"
+                          >
+                            <Infinity className="w-4 h-4" />
+                            <span className="text-[10px] font-medium">♾️ Endlosrunde starten</span>
+                          </button>
+                        ) : (
+                          <div className="p-3 bg-zinc-800 rounded-lg space-y-3">
+                            {loadingCategories ? (
+                              <div className="flex items-center justify-center gap-2 py-2 text-zinc-400">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-xs">Lade Kategorien...</span>
+                              </div>
+                            ) : (
+                              <>
+                                <select
+                                  value={selectedEndlessCategory}
+                                  onChange={(e) => setSelectedEndlessCategory(e.target.value)}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                                >
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.slug}>
+                                      {cat.icon} {cat.name} ({cat._count?.questions || 0})
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={startEndlessRound}
+                                    disabled={!selectedEndlessCategory}
+                                    className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 border-violet-500/30 disabled:opacity-50"
+                                  >
+                                    <Play className="w-4 h-4" />
+                                    <span className="text-xs font-medium">Starten</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setShowEndlessDropdown(false)}
+                                    className="px-3 py-2 rounded-lg border border-zinc-600 text-zinc-400 hover:bg-zinc-700 transition-colors text-xs"
+                                  >
+                                    Abbrechen
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Players List */}
                     <div>
                       <h4 className="text-xs text-zinc-400 mb-2 uppercase tracking-wider">
@@ -212,9 +295,7 @@ export function DevPanel() {
                     </div>
 
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

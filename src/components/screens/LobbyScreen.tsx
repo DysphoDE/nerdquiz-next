@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, useIsHost } from '@/store/gameStore';
+import { useDevMode } from '@/hooks/useDevMode';
 import { Button } from '@/components/ui/button';
 import { 
   Copy, 
@@ -493,12 +494,50 @@ export function LobbyScreen() {
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
   const isHost = useIsHost();
+  const { isDevMode, activateDevMode } = useDevMode();
   
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [devModeActivated, setDevModeActivated] = useState(false);
+  
+  // Secret code listener for dev mode activation
+  const typedCharsRef = useRef('');
+  
+  useEffect(() => {
+    // Only listen for secret code if host and not already in dev mode
+    if (!isHost || isDevMode) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      // Add character to buffer
+      if (e.key.length === 1) {
+        typedCharsRef.current += e.key.toLowerCase();
+        
+        // Keep only last 20 characters
+        if (typedCharsRef.current.length > 20) {
+          typedCharsRef.current = typedCharsRef.current.slice(-20);
+        }
+        
+        // Check if secret code was typed
+        if (typedCharsRef.current.includes('clairobscur99')) {
+          if (activateDevMode('clairobscur99')) {
+            setDevModeActivated(true);
+            typedCharsRef.current = '';
+            // Hide notification after 3 seconds
+            setTimeout(() => setDevModeActivated(false), 3000);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isHost, isDevMode, activateDevMode]);
 
   if (!room) return null;
 
@@ -539,6 +578,21 @@ export function LobbyScreen() {
       exit={{ opacity: 0 }}
       className="min-h-screen flex flex-col p-4 md:p-8 relative overflow-hidden"
     >
+      {/* Dev Mode Activation Toast */}
+      <AnimatePresence>
+        {devModeActivated && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-xl bg-yellow-500 text-black font-bold shadow-2xl flex items-center gap-2"
+          >
+            <span className="text-lg">🔧</span>
+            <span>Dev Mode aktiviert!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(6)].map((_, i) => (
