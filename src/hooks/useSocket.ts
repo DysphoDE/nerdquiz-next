@@ -253,6 +253,10 @@ export function useSocket() {
   }, []);
 
   const leaveGame = useCallback(() => {
+    // Deactivate dev mode when leaving a room
+    const { deactivateDevMode } = require('@/lib/devMode');
+    deactivateDevMode();
+    
     clearSession();
     reset();
   }, [reset]);
