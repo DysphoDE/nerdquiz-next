@@ -67,8 +67,8 @@ export async function startQuestion(room: GameRoom, io: SocketServer): Promise<v
   let question = room.state.roundQuestions[room.state.currentQuestionIndex];
   
   // Check if we need to load more questions (Endless Mode)
-  const isEndlessMode = (room as any).isEndlessMode === true;
-  const endlessCategoryId = (room as any).endlessCategoryId as string | undefined;
+  const isEndlessMode = room.isEndlessMode === true;
+  const endlessCategoryId = room.endlessCategoryId;
   
   if (!question && isEndlessMode && endlessCategoryId) {
     // Load more questions for endless mode

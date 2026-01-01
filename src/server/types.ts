@@ -240,6 +240,11 @@ export interface GameRoom {
   questionTimer?: NodeJS.Timeout;
   forcedCategoryMode?: CategorySelectionMode;
   pendingBonusQuestion?: BonusRoundConfig;
+  // Dev mode enabled via secret code (for production testing)
+  devModeEnabled?: boolean;
+  // Endless mode properties
+  isEndlessMode?: boolean;
+  endlessCategoryId?: string;
 }
 
 // ============================================

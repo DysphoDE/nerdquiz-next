@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSocket } from '@/hooks/useSocket';
+import { getSocket } from '@/lib/socket';
 import { useGameStore, useIsHost } from '@/store/gameStore';
 import { useDevMode } from '@/hooks/useDevMode';
 import { Button } from '@/components/ui/button';
@@ -528,6 +529,15 @@ export function LobbyScreen() {
           if (activateDevMode('clairobscur99')) {
             setDevModeActivated(true);
             typedCharsRef.current = '';
+            
+            // Notify the server to enable dev commands for this room
+            const socket = getSocket();
+            socket.emit('enable_dev_mode', {
+              roomCode: room?.code,
+              playerId: playerId,
+              secretCode: 'clairobscur99',
+            });
+            
             // Hide notification after 3 seconds
             setTimeout(() => setDevModeActivated(false), 3000);
           }

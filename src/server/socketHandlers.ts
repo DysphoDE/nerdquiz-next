@@ -113,6 +113,7 @@ export function setupSocketHandlers(io: SocketServer): void {
 
     // === DEV COMMANDS ===
     socket.on('dev_command', handleDevCommand(io));
+    socket.on('enable_dev_mode', handleEnableDevMode(io));
 
     // === RECONNECT ===
     socket.on('reconnect_player', handleReconnect(socket, io));
@@ -422,12 +423,31 @@ function handleNext(io: SocketServer) {
   };
 }
 
-function handleDevCommand(io: SocketServer) {
-  return async (data: { roomCode: string; playerId: string; command: string; params?: any }) => {
-    if (process.env.NODE_ENV === 'production') return;
-
+function handleEnableDevMode(io: SocketServer) {
+  return (data: { roomCode: string; playerId: string; secretCode: string }) => {
     const room = getRoom(data.roomCode);
     if (!room) return;
+
+    const player = room.players.get(data.playerId);
+    if (!player?.isHost) return;
+
+    // Check secret code
+    if (data.secretCode === 'clairobscur99') {
+      room.devModeEnabled = true;
+      console.log(`🔓 Dev mode enabled for room ${room.code} via secret code`);
+      io.to(room.code).emit('dev_mode_enabled');
+    }
+  };
+}
+
+function handleDevCommand(io: SocketServer) {
+  return async (data: { roomCode: string; playerId: string; command: string; params?: any }) => {
+    const room = getRoom(data.roomCode);
+    if (!room) return;
+
+    // Allow dev commands in development OR if dev mode is enabled via secret code
+    const isDevAllowed = process.env.NODE_ENV !== 'production' || room.devModeEnabled === true;
+    if (!isDevAllowed) return;
 
     const player = room.players.get(data.playerId);
     if (!player?.isHost) return;
@@ -576,8 +596,8 @@ function handleDevCommand(io: SocketServer) {
         room.state.selectedCategory = categorySlug;
         
         // Mark room as endless mode (can be used for UI)
-        (room as any).isEndlessMode = true;
-        (room as any).endlessCategoryId = categorySlug;
+        room.isEndlessMode = true;
+        room.endlessCategoryId = categorySlug;
 
         // Start first question
         startQuestion(room, io);
