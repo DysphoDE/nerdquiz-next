@@ -3,7 +3,7 @@
  */
 
 import { create } from 'zustand';
-import type { RoomState, AnswerResult, FinalRanking, Player } from '@/types/game';
+import type { RoomState, AnswerResult, FinalRanking, Player, GameStatistics } from '@/types/game';
 
 // Bonus Round End Result
 export interface BonusRoundPlayerScore {
@@ -44,6 +44,7 @@ interface GameStore {
   // Results
   lastResults: AnswerResult[] | null;
   finalRankings: FinalRanking[] | null;
+  gameStatistics: GameStatistics | null;
   bonusRoundResult: BonusRoundEndResult | null;
   
   // Actions
@@ -55,6 +56,7 @@ interface GameStore {
   setHasSubmitted: (submitted: boolean) => void;
   setLastResults: (results: AnswerResult[] | null) => void;
   setFinalRankings: (rankings: FinalRanking[] | null) => void;
+  setGameStatistics: (stats: GameStatistics | null) => void;
   setBonusRoundResult: (result: BonusRoundEndResult | null) => void;
   
   // Utility
@@ -72,6 +74,7 @@ const initialState = {
   hasSubmitted: false,
   lastResults: null as AnswerResult[] | null,
   finalRankings: null as FinalRanking[] | null,
+  gameStatistics: null as GameStatistics | null,
   bonusRoundResult: null as BonusRoundEndResult | null,
 };
 
@@ -93,6 +96,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setLastResults: (results) => set({ lastResults: results }),
   
   setFinalRankings: (rankings) => set({ finalRankings: rankings }),
+  
+  setGameStatistics: (stats) => set({ gameStatistics: stats }),
   
   setBonusRoundResult: (result) => set({ bonusRoundResult: result }),
   

@@ -480,29 +480,6 @@ export function RoundAnnouncementScreen() {
                 {selectedConfig.description}
               </motion.p>
               
-              {/* Visual flair */}
-              <motion.div
-                className="flex justify-center gap-2 mt-3 sm:mt-4"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                {[...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className={cn(
-                      "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full",
-                      isBonusRound ? "bg-amber-500" : "bg-primary"
-                    )}
-                    animate={{ scale: [1, 1.3, 1] }}
-                    transition={{
-                      duration: 0.8,
-                      repeat: Infinity,
-                      delay: i * 0.15,
-                    }}
-                  />
-                ))}
-              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

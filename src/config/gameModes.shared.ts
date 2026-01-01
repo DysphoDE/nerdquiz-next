@@ -195,6 +195,9 @@ export function selectRandomCategoryMode(
     // Genug Spieler?
     if (playerCount < mode.minPlayers) return false;
     
+    // Loser's Pick: Nicht in Runde 1 (es gibt noch keinen Loser mit unterschiedlichem Score)
+    if (mode.id === 'losers_pick' && currentRound <= 1) return false;
+    
     // Cooldown erfüllt?
     if (mode.cooldownRounds > 0) {
       const lastUsedRound = lastModeRounds.get(mode.id);

@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useGameStore, type BonusRoundEndResult } from '@/store/gameStore';
-import type { RoomState, AnswerResult, FinalRanking } from '@/types/game';
+import type { RoomState, AnswerResult, FinalRanking, GameStatistics } from '@/types/game';
 import { getSocket } from '@/lib/socket';
 import { saveSession, clearSession } from '@/lib/session';
 
@@ -13,6 +13,7 @@ export function useSocket() {
     setRoom,
     setLastResults,
     setFinalRankings,
+    setGameStatistics,
     setBonusRoundResult,
     resetQuestion,
     reset,
@@ -56,9 +57,12 @@ export function useSocket() {
       setLastResults(data.results);
     };
 
-    const handleGameOver = ({ rankings }: { rankings: FinalRanking[] }) => {
-      console.log('🏆 Game over:', rankings);
+    const handleGameOver = ({ rankings, statistics }: { rankings: FinalRanking[]; statistics?: GameStatistics }) => {
+      console.log('🏆 Game over:', rankings, statistics);
       setFinalRankings(rankings);
+      if (statistics) {
+        setGameStatistics(statistics);
+      }
     };
 
     const handlePlayerJoined = ({ playerName }: { playerName: string }) => {
@@ -131,7 +135,7 @@ export function useSocket() {
       socket.off('kicked_from_room', handleKickedFromRoom);
       socket.off('rematch_result', handleRematchResult);
     };
-  }, [setConnected, setRoom, setLastResults, setFinalRankings, setBonusRoundResult, resetQuestion, reset]);
+  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setBonusRoundResult, resetQuestion, reset]);
 
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store

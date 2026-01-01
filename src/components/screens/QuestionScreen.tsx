@@ -795,7 +795,7 @@ function AnswerAvatar({
             isRevealed && isCorrect ? 'border-green-500 bg-green-500/20' : 'border-muted-foreground/50 bg-muted/20'
           )}
         />
-        {/* Time Badge - hide on mobile compact */}
+        {/* Time Badge - smaller on mobile but still visible */}
         {result.responseTimeMs != null && (
           <motion.div 
             initial={{ scale: 0 }}
@@ -803,7 +803,7 @@ function AnswerAvatar({
             transition={{ delay: slotIndex * 0.08 + 0.2, type: 'spring' }}
             className={cn(
               "absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full bg-cyan-500 text-[9px] font-bold text-white shadow-md",
-              compact && "max-sm:hidden"
+              compact && "max-sm:-top-1 max-sm:-right-1 max-sm:px-1 max-sm:text-[7px]"
             )}
           >
             {(result.responseTimeMs / 1000).toFixed(1)}s

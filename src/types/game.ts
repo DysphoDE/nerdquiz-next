@@ -232,6 +232,56 @@ export interface FinalRanking {
 }
 
 // ============================================
+// GAME STATISTICS (from server)
+// ============================================
+
+export interface PlayerStatistics {
+  playerId: string;
+  playerName: string;
+  avatarSeed: string;
+  correctAnswers: number;
+  totalAnswers: number;
+  accuracy: number; // 0-100
+  estimationPoints: number;
+  estimationQuestions: number;
+  fastestAnswer: number | null; // ms
+  longestStreak: number;
+}
+
+export interface CategoryPerformance {
+  category: string;
+  correct: number;
+  total: number;
+  accuracy: number; // 0-100
+}
+
+export interface BestEstimator {
+  playerId: string;
+  playerName: string;
+  avatarSeed: string;
+  points: number;
+  questions: number;
+}
+
+export interface FastestFinger {
+  playerId: string;
+  playerName: string;
+  avatarSeed: string;
+  avgResponseTime: number | null; // ms
+  responsesCount: number;
+}
+
+export interface GameStatistics {
+  totalQuestions: number;
+  playerStatistics: PlayerStatistics[];
+  bestEstimator: BestEstimator | null;
+  fastestFingers: FastestFinger[];
+  bestCategory: CategoryPerformance | null;
+  worstCategory: CategoryPerformance | null;
+  categoryPerformance: CategoryPerformance[];
+}
+
+// ============================================
 // REMATCH VOTING
 // ============================================
 

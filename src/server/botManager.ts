@@ -293,7 +293,8 @@ class BotManager {
           : duel.player2Choices?.[currentIndex];
 
         if (!hasChosen) {
-          const delay = this.randomDelay(1000, 4000);
+          // Bots choose immediately (100-400ms) to not slow down the game
+          const delay = this.randomDelay(100, 400);
           const timerId = `${bot.id}-rps-${duel.currentRound}`;
           
           const timer = setTimeout(() => {
