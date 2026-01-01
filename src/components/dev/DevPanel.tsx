@@ -42,14 +42,12 @@ export function DevPanel() {
   const playerId = useGameStore((s) => s.playerId);
   const { isDevMode } = useDevMode();
 
-  // Don't render if dev mode is not enabled
-  if (!isDevMode) return null;
-
   const socket = getSocket();
   const roomCode = room?.code;
 
   // Load categories when endless dropdown is opened
   useEffect(() => {
+    if (!isDevMode) return; // Skip if not in dev mode
     if (showEndlessDropdown && categories.length === 0 && !loadingCategories) {
       setLoadingCategories(true);
       fetch('/api/admin/categories')
@@ -63,7 +61,10 @@ export function DevPanel() {
         .catch(err => console.error('Failed to load categories:', err))
         .finally(() => setLoadingCategories(false));
     }
-  }, [showEndlessDropdown, categories.length, loadingCategories]);
+  }, [showEndlessDropdown, categories.length, loadingCategories, isDevMode]);
+
+  // Don't render if dev mode is not enabled
+  if (!isDevMode) return null;
 
   // Dev commands
   const devCommand = (command: string, params?: any) => {
@@ -134,7 +135,7 @@ export function DevPanel() {
             </div>
 
             {/* Content - always visible when panel is open */}
-            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                  <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
                     
                     {/* Current State */}
                     <div className="text-xs space-y-1 p-2 bg-zinc-800 rounded-lg">
@@ -295,7 +296,6 @@ export function DevPanel() {
                     </div>
 
                   </div>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
