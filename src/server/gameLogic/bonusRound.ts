@@ -39,6 +39,7 @@ export function startBonusRound(room: GameRoom, io: SocketServer, config: BonusR
 
   room.state.bonusRound = {
     phase: 'intro',
+    questionId: config.id, // Store DB question ID for dev-mode editing
     topic: config.topic,
     description: config.description,
     category: config.category,

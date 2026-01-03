@@ -118,10 +118,12 @@ export interface BonusRoundItem {
   guessedBy?: string; // Player ID who guessed it
   guessedByName?: string;
   guessedAt?: number; // Timestamp
+  aliases?: string[]; // Only present for already guessed items (for duplicate detection)
 }
 
 export interface BonusRoundState {
   phase: 'intro' | 'playing' | 'finished';
+  questionId?: string; // DB question ID for dev-mode editing
   topic: string;
   description?: string;
   category?: string;

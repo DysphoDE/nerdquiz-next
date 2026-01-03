@@ -284,6 +284,7 @@ function MiniSlots({ items, spinning }: { items: RouletteItem[]; spinning: boole
 export function RoundAnnouncementScreen() {
   const room = useGameStore((s) => s.room);
   const [rouletteComplete, setRouletteComplete] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
   
   if (!room) return null;
 
@@ -439,13 +440,17 @@ export function RoundAnnouncementScreen() {
             items={rouletteItems}
             selectedId={selectedId}
             size={isBonusRound ? 'large' : 'normal'}
-            onComplete={() => setRouletteComplete(true)}
+            onComplete={() => {
+              setShowDescription(true);
+              // Nach 1 Sekunde weitergehen (damit Erklärungsbox lesbar ist)
+              setTimeout(() => setRouletteComplete(true), 1000);
+            }}
           />
         </motion.div>
 
         {/* Mini slots preview - only show while spinning, hide on very small screens */}
         <AnimatePresence>
-          {!rouletteComplete && (
+          {!showDescription && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -460,7 +465,7 @@ export function RoundAnnouncementScreen() {
 
         {/* Result description - shows after roulette lands */}
         <AnimatePresence>
-          {rouletteComplete && selectedConfig && (
+          {showDescription && selectedConfig && (
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -486,7 +491,7 @@ export function RoundAnnouncementScreen() {
 
         {/* Loading indicator - only show while spinning */}
         <AnimatePresence>
-          {!rouletteComplete && (
+          {!showDescription && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

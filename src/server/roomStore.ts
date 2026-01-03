@@ -238,6 +238,7 @@ export function roomToClient(room: GameRoom): Record<string, any> {
   // Convert BonusRound state for client (Set -> Array, hide aliases)
   const bonusRoundClient = room.state.bonusRound ? {
     phase: room.state.bonusRound.phase,
+    questionId: room.state.bonusRound.questionId, // For dev-mode editing
     topic: room.state.bonusRound.topic,
     description: room.state.bonusRound.description,
     category: room.state.bonusRound.category,
@@ -251,6 +252,8 @@ export function roomToClient(room: GameRoom): Record<string, any> {
       guessedBy: item.guessedBy,
       guessedByName: item.guessedByName,
       guessedAt: item.guessedAt,
+      // Only send aliases for already guessed items (for duplicate detection on client)
+      aliases: item.guessedBy ? item.aliases : undefined,
     })),
     revealedCount: room.state.bonusRound.guessedIds.size,
     currentTurn: room.state.bonusRound.activePlayers.length > 0 && room.state.bonusRound.phase === 'playing' ? (() => {

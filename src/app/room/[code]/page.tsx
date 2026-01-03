@@ -7,6 +7,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/store/gameStore';
 import { loadSession, hasSessionForRoom, clearSession } from '@/lib/session';
 import { DevPanel } from '@/components/dev/DevPanel';
+import { QuestionDebugPanel } from '@/components/dev/QuestionDebugPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -275,6 +276,9 @@ export default function RoomPage() {
       
       {/* Dev Panel - only shows in development mode */}
       <DevPanel />
+      
+      {/* Question Debug Panel - floating panel for question-specific dev actions */}
+      <QuestionDebugPanel />
     </>
   );
 }

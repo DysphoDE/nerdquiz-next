@@ -125,6 +125,7 @@ export interface BonusRoundItem {
 
 export interface ServerBonusRoundState {
   phase: 'intro' | 'playing' | 'finished';
+  questionId?: string; // DB question ID for dev-mode editing
   topic: string;
   description?: string;
   category?: string;
@@ -245,6 +246,10 @@ export interface GameRoom {
   // Endless mode properties
   isEndlessMode?: boolean;
   endlessCategoryId?: string;
+  // Pause state (dev mode only)
+  isPaused?: boolean;
+  pausedAt?: number; // Timestamp when paused
+  remainingTime?: number; // Remaining time in ms when paused
 }
 
 // ============================================

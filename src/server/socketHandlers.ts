@@ -608,6 +608,78 @@ function handleDevCommand(io: SocketServer) {
         });
         break;
       }
+
+      case 'pause_game': {
+        // Pause the game timer
+        if (room.isPaused) break;
+        
+        room.isPaused = true;
+        room.pausedAt = Date.now();
+        
+        // Calculate remaining time
+        if (room.state.timerEnd) {
+          room.remainingTime = Math.max(0, room.state.timerEnd - Date.now());
+        }
+        
+        // Clear any existing timer
+        if (room.questionTimer) {
+          clearTimeout(room.questionTimer);
+          room.questionTimer = undefined;
+        }
+        
+        // Also pause bonus round timer if active
+        if (room.state.bonusRound?.currentTurnTimer) {
+          clearTimeout(room.state.bonusRound.currentTurnTimer);
+          room.state.bonusRound.currentTurnTimer = null;
+        }
+        
+        io.to(room.code).emit('game_paused', { paused: true });
+        io.to(room.code).emit('dev_notification', { message: '⏸️ Spiel pausiert' });
+        console.log(`⏸️ Game paused in room ${room.code}`);
+        break;
+      }
+
+      case 'resume_game': {
+        // Resume the game timer
+        if (!room.isPaused) break;
+        
+        room.isPaused = false;
+        
+        // Restore timer with remaining time
+        if (room.remainingTime && room.remainingTime > 0) {
+          room.state.timerEnd = Date.now() + room.remainingTime;
+          
+          // Re-schedule the timeout
+          room.questionTimer = setTimeout(() => {
+            if (room.state.phase === 'question') {
+              showAnswer(room, io);
+            } else if (room.state.phase === 'estimation') {
+              showEstimationAnswer(room, io);
+            }
+          }, room.remainingTime);
+        }
+        
+        // Resume bonus round timer if active
+        if (room.state.bonusRound && room.state.phase === 'bonus_round') {
+          const bonusRound = room.state.bonusRound;
+          if (bonusRound.phase === 'playing' && room.remainingTime) {
+            // Re-schedule bonus round turn timer
+            const { handleBonusRoundTimeout } = require('./gameLogic/bonusRound');
+            bonusRound.currentTurnTimer = setTimeout(() => {
+              handleBonusRoundTimeout(room, io);
+            }, room.remainingTime);
+          }
+        }
+        
+        room.pausedAt = undefined;
+        room.remainingTime = undefined;
+        
+        io.to(room.code).emit('game_paused', { paused: false });
+        broadcastRoomUpdate(room, io);
+        io.to(room.code).emit('dev_notification', { message: '▶️ Spiel fortgesetzt' });
+        console.log(`▶️ Game resumed in room ${room.code}`);
+        break;
+      }
     }
   };
 }

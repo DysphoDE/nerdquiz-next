@@ -37,6 +37,17 @@ export function CollectiveListGame() {
   const [inputValue, setInputValue] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [lastResult, setLastResult] = useState<'correct' | 'wrong' | 'already_guessed' | null>(null);
+  const [guessLog, setGuessLog] = useState<Array<{
+    id: string;
+    playerId: string;
+    playerName: string;
+    avatarSeed: string;
+    input: string;
+    result: 'correct' | 'wrong' | 'already_guessed' | 'timeout' | 'skip';
+    matchedDisplay?: string;
+  }>>([]);
+  const lastProcessedGuessRef = useRef<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const bonusRound = room?.bonusRound as BonusRoundState | null;
@@ -74,23 +85,89 @@ export function CollectiveListGame() {
     }
   }, [lastResult]);
 
-  // Listen for result events
+  // Listen for result events and add to log
   useEffect(() => {
-    if (bonusRound?.lastGuess?.playerId === playerId) {
-      if (bonusRound.lastGuess.result === 'correct') {
+    const guess = bonusRound?.lastGuess;
+    if (!guess) return;
+    
+    // Create unique ID for this guess
+    const guessId = `${guess.playerId}-${guess.input}-${guess.result}`;
+    
+    // Skip if we already processed this guess
+    if (lastProcessedGuessRef.current === guessId) return;
+    lastProcessedGuessRef.current = guessId;
+    
+    // Set personal result feedback
+    if (guess.playerId === playerId) {
+      if (guess.result === 'correct') {
         setLastResult('correct');
-      } else if (bonusRound.lastGuess.result === 'wrong') {
+      } else if (guess.result === 'wrong') {
         setLastResult('wrong');
-      } else if (bonusRound.lastGuess.result === 'already_guessed') {
+      } else if (guess.result === 'already_guessed') {
         setLastResult('already_guessed');
       }
     }
-  }, [bonusRound?.lastGuess, playerId]);
+    
+    // Add to log (for all players, except skip)
+    const player = players.find(p => p.id === guess.playerId);
+    if (player && guess.result !== 'skip') {
+      const logEntry = {
+        id: guessId,
+        playerId: guess.playerId,
+        playerName: player.name,
+        avatarSeed: player.avatarSeed,
+        input: guess.input || '',
+        result: guess.result as 'correct' | 'wrong' | 'already_guessed' | 'timeout' | 'skip',
+        matchedDisplay: guess.matchedDisplay,
+      };
+      
+      setGuessLog(prev => {
+        // Skip if already in log
+        if (prev.some(entry => entry.id === guessId)) return prev;
+        // Keep last 20 entries for the final summary
+        return [logEntry, ...prev].slice(0, 20);
+      });
+    }
+  }, [bonusRound?.lastGuess, playerId, players]);
+
+  // Check if input matches an already guessed item (exact match against display or aliases)
+  const checkForDuplicate = (value: string): string | null => {
+    if (!bonusRound?.items || !value.trim()) return null;
+    
+    const normalizedInput = value.trim().toLowerCase();
+    
+    for (const item of bonusRound.items) {
+      if (!item.guessedBy) continue; // Not guessed yet
+      
+      // Exact match against display name
+      if (item.display.toLowerCase() === normalizedInput) {
+        return item.display;
+      }
+      
+      // Exact match against any alias (only available for guessed items)
+      if (item.aliases) {
+        for (const alias of item.aliases) {
+          if (alias.toLowerCase() === normalizedInput) {
+            return item.display;
+          }
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  // Update duplicate warning when input changes
+  useEffect(() => {
+    const duplicate = checkForDuplicate(inputValue);
+    setDuplicateWarning(duplicate);
+  }, [inputValue, bonusRound?.items]);
 
   const handleSubmit = () => {
-    if (!inputValue.trim() || !isMyTurn) return;
+    if (!inputValue.trim() || !isMyTurn || duplicateWarning) return;
     submitBonusRoundAnswer(inputValue.trim());
     setInputValue('');
+    setDuplicateWarning(null);
   };
 
   const handleSkip = () => {
@@ -251,11 +328,12 @@ export function CollectiveListGame() {
               </motion.div>
             )}
 
-            {/* Current Turn Indicator */}
+            {/* Current Turn Indicator with Recent Guesses Log */}
             {isPlaying && currentTurnPlayer && (
-              <Card className="glass p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+              <Card className="glass p-3 sm:p-4 mb-4">
+                <div className="flex items-center justify-between gap-3">
+                  {/* Left: Current player */}
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     <GameAvatar
                       seed={currentTurnPlayer.avatarSeed}
                       mood={isMyTurn ? 'hopeful' : 'neutral'}
@@ -266,64 +344,56 @@ export function CollectiveListGame() {
                       )}
                     />
                     <div>
-                      <p className="font-bold text-lg">
-                        {isMyTurn ? 'Du bist dran!' : `${currentTurnPlayer.name} ist dran`}
+                      <p className="font-bold text-sm sm:text-lg">
+                        {isMyTurn ? 'Du bist dran!' : `${currentTurnPlayer.name}`}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         Zug #{bonusRound.currentTurn?.turnNumber}
                       </p>
                     </div>
                   </div>
                   
-                  {/* Last guess result */}
-                  <AnimatePresence>
-                    {bonusRound.lastGuess && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
-                        className={cn(
-                          'px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2',
-                          bonusRound.lastGuess.result === 'correct' && 'bg-green-500/20 text-green-500',
-                          bonusRound.lastGuess.result === 'wrong' && 'bg-red-500/20 text-red-500',
-                          bonusRound.lastGuess.result === 'already_guessed' && 'bg-orange-500/20 text-orange-500',
-                          bonusRound.lastGuess.result === 'timeout' && 'bg-red-500/20 text-red-500',
-                          bonusRound.lastGuess.result === 'skip' && 'bg-muted text-muted-foreground',
-                        )}
-                      >
-                        {bonusRound.lastGuess.result === 'correct' && (
-                          <>
-                            <Check className="w-4 h-4" />
-                            {bonusRound.lastGuess.matchedDisplay}
-                          </>
-                        )}
-                        {bonusRound.lastGuess.result === 'wrong' && (
-                          <>
-                            <X className="w-4 h-4" />
-                            Falsch: "{bonusRound.lastGuess.input}"
-                          </>
-                        )}
-                        {bonusRound.lastGuess.result === 'already_guessed' && (
-                          <>
-                            <AlertCircle className="w-4 h-4" />
-                            Bereits genannt!
-                          </>
-                        )}
-                        {bonusRound.lastGuess.result === 'timeout' && (
-                          <>
-                            <Timer className="w-4 h-4" />
-                            Zeit abgelaufen
-                          </>
-                        )}
-                        {bonusRound.lastGuess.result === 'skip' && (
-                          <>
-                            <SkipForward className="w-4 h-4" />
-                            Übersprungen
-                          </>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Right: Recent guesses log (compact, last 5) */}
+                  <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-end max-w-[55%] overflow-hidden">
+                    <AnimatePresence mode="popLayout">
+                      {guessLog.slice(0, 5).map((entry) => (
+                        <motion.div
+                          key={entry.id}
+                          initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                          animate={{ opacity: 1, scale: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className={cn(
+                            'px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium flex items-center gap-0.5 sm:gap-1 whitespace-nowrap',
+                            entry.result === 'correct' && 'bg-green-500/20 text-green-400',
+                            (entry.result === 'wrong' || entry.result === 'timeout') && 'bg-red-500/20 text-red-400',
+                            entry.result === 'already_guessed' && 'bg-orange-500/20 text-orange-400'
+                          )}
+                        >
+                          {entry.result === 'correct' ? (
+                            <>
+                              <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="max-w-[60px] sm:max-w-[80px] truncate">{entry.matchedDisplay}</span>
+                            </>
+                          ) : entry.result === 'wrong' ? (
+                            <>
+                              <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="max-w-[60px] sm:max-w-[80px] truncate">"{entry.input}"</span>
+                            </>
+                          ) : entry.result === 'timeout' ? (
+                            <>
+                              <Timer className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span>⏰</span>
+                            </>
+                          ) : entry.result === 'already_guessed' ? (
+                            <>
+                              <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="max-w-[60px] sm:max-w-[80px] truncate">"{entry.input}"</span>
+                            </>
+                          ) : null}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
                 </div>
               </Card>
             )}
@@ -435,18 +505,45 @@ export function CollectiveListGame() {
                           onChange={(e) => setInputValue(e.target.value)}
                           onKeyDown={handleKeyDown}
                           placeholder="Deine Antwort..."
-                          className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-background border border-input focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-base sm:text-lg"
+                          className={cn(
+                            "flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-background border outline-none text-base sm:text-lg transition-colors",
+                            duplicateWarning 
+                              ? "border-orange-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20" 
+                              : "border-input focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                          )}
                           autoComplete="off"
                           autoCapitalize="off"
                         />
                         <Button
                           onClick={handleSubmit}
-                          disabled={!inputValue.trim()}
-                          className="px-4 sm:px-6 bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                          disabled={!inputValue.trim() || !!duplicateWarning}
+                          className={cn(
+                            "px-4 sm:px-6 font-bold",
+                            duplicateWarning 
+                              ? "bg-orange-500/50 text-orange-200 cursor-not-allowed"
+                              : "bg-amber-500 hover:bg-amber-600 text-black"
+                          )}
                         >
                           <Send className="w-5 h-5" />
                         </Button>
                       </div>
+                      {/* Duplicate Warning */}
+                      <AnimatePresence>
+                        {duplicateWarning && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/20 border border-orange-500/30 text-orange-400 text-sm"
+                          >
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            <span>
+                              <strong>"{duplicateWarning}"</strong> wurde bereits genannt!
+                            </span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      
                       <div className="flex justify-between items-center">
                         <p className="text-xs text-muted-foreground hidden sm:block">
                           Tippfehler werden toleriert!
@@ -532,10 +629,13 @@ export function CollectiveListGame() {
                       <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 text-center">
                         Punkte-Übersicht
                       </h4>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {bonusRoundResult.playerScoreBreakdown.map((score, index) => {
                           const isMe = score.playerId === playerId;
                           const isWinner = score.rank === 1;
+                          
+                          // Get this player's guesses from the log
+                          const playerGuesses = guessLog.filter(g => g.playerId === score.playerId);
                           
                           return (
                             <motion.div
@@ -544,52 +644,72 @@ export function CollectiveListGame() {
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: 0.1 * index }}
                               className={cn(
-                                'flex items-center gap-3 p-3 rounded-xl transition-all',
+                                'p-3 rounded-xl transition-all',
                                 isWinner && 'bg-gradient-to-r from-amber-500/20 to-transparent border border-amber-500/30',
                                 isMe && !isWinner && 'bg-primary/10 border border-primary/30',
                                 !isWinner && !isMe && 'bg-muted/30'
                               )}
                             >
-                              {/* Rank */}
-                              <div className={cn(
-                                'w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0',
-                                isWinner ? 'bg-amber-500 text-black' : 'bg-muted text-muted-foreground'
-                              )}>
-                                {isWinner ? <Crown className="w-4 h-4" /> : score.rank}
-                              </div>
+                              <div className="flex items-center gap-3">
+                                {/* Rank */}
+                                <div className={cn(
+                                  'w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0',
+                                  isWinner ? 'bg-amber-500 text-black' : 'bg-muted text-muted-foreground'
+                                )}>
+                                  {isWinner ? <Crown className="w-4 h-4" /> : score.rank}
+                                </div>
 
-                              {/* Avatar & Name */}
-                              <GameAvatar 
-                                seed={score.avatarSeed} 
-                                mood={isWinner ? 'superHappy' : 'neutral'} 
-                                size="sm" 
-                              />
-                              <div className="flex-1 min-w-0">
-                                <span className={cn("font-bold truncate", isMe && "text-primary")}>
-                                  {score.playerName}
-                                  {isMe && <span className="text-xs ml-1">(Du)</span>}
-                                </span>
-                              </div>
+                                {/* Avatar & Name */}
+                                <GameAvatar 
+                                  seed={score.avatarSeed} 
+                                  mood={isWinner ? 'superHappy' : 'neutral'} 
+                                  size="sm" 
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <span className={cn("font-bold truncate", isMe && "text-primary")}>
+                                    {score.playerName}
+                                    {isMe && <span className="text-xs ml-1">(Du)</span>}
+                                  </span>
+                                </div>
 
-                              {/* Points Breakdown */}
-                              <div className="text-right text-sm shrink-0">
-                                <div className="flex items-center gap-2 justify-end">
-                                  {score.correctAnswers > 0 && (
-                                    <span className="text-green-500">
-                                      {score.correctAnswers}×{bonusRoundResult.pointsPerCorrect}
+                                {/* Points Breakdown */}
+                                <div className="text-right text-sm shrink-0">
+                                  <div className="flex items-center gap-2 justify-end">
+                                    {score.correctAnswers > 0 && (
+                                      <span className="text-green-500">
+                                        {score.correctAnswers}×{bonusRoundResult.pointsPerCorrect}
+                                      </span>
+                                    )}
+                                    {score.rankBonus > 0 && (
+                                      <>
+                                        <span className="text-muted-foreground">+</span>
+                                        <span className="text-amber-500">🏆{score.rankBonus}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="font-mono font-black text-lg text-primary">
+                                    +{score.totalPoints}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Player's guesses */}
+                              {playerGuesses.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2 pl-11">
+                                  {playerGuesses.map((guess) => (
+                                    <span
+                                      key={guess.id}
+                                      className={cn(
+                                        'px-1.5 py-0.5 rounded text-xs font-medium',
+                                        guess.result === 'correct' && 'bg-green-500/20 text-green-400',
+                                        (guess.result === 'wrong' || guess.result === 'timeout' || guess.result === 'already_guessed') && 'bg-red-500/20 text-red-400'
+                                      )}
+                                    >
+                                      {guess.result === 'correct' ? guess.matchedDisplay : `"${guess.input || '⏰'}"`}
                                     </span>
-                                  )}
-                                  {score.rankBonus > 0 && (
-                                    <>
-                                      <span className="text-muted-foreground">+</span>
-                                      <span className="text-amber-500">🏆{score.rankBonus}</span>
-                                    </>
-                                  )}
+                                  ))}
                                 </div>
-                                <div className="font-mono font-black text-lg text-primary">
-                                  +{score.totalPoints}
-                                </div>
-                              </div>
+                              )}
                             </motion.div>
                           );
                         })}
@@ -668,7 +788,7 @@ export function CollectiveListGame() {
         )}
         </div>
 
-        {/* Desktop Leaderboard Sidebar */}
+        {/* Desktop Sidebar - Rangliste */}
         <div className="hidden lg:block w-80">
           <div className="glass rounded-2xl p-4 space-y-2 sticky top-6">
             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Rangliste</h3>

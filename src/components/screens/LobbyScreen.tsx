@@ -950,38 +950,120 @@ export function LobbyScreen() {
           </div>
         ) : (
           <motion.div 
-            className="text-center py-8 glass rounded-2xl relative overflow-hidden"
+            className="space-y-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            {/* Animated background gradient */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5"
-              animate={{
-                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-              }}
-              transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
-              style={{ backgroundSize: '200% 100%' }}
-            />
+            {/* Current Settings Display */}
+            <div className="glass rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Settings2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-semibold text-muted-foreground">Aktuelle Einstellungen</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {/* Rounds */}
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">Runden</span>
+                  </div>
+                  <motion.span 
+                    key={room.settings.maxRounds}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="text-2xl font-black text-primary"
+                  >
+                    {room.settings.maxRounds}
+                  </motion.span>
+                </div>
+                
+                {/* Questions per Round */}
+                <div className="glass rounded-xl p-3 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <HelpCircle className="w-4 h-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">Fragen/Runde</span>
+                  </div>
+                  <motion.span 
+                    key={room.settings.questionsPerRound}
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="text-2xl font-black text-primary"
+                  >
+                    {room.settings.questionsPerRound}
+                  </motion.span>
+                </div>
+              </div>
+              
+              {/* Bonus Round Settings */}
+              {(room.settings.finalRoundAlwaysBonus || (room.settings.bonusRoundChance ?? 0) > 0) && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-3 pt-3 border-t border-border/50"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Gift className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-500 font-semibold">Bonusrunden</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {room.settings.finalRoundAlwaysBonus && (
+                      <motion.span 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 flex items-center gap-1"
+                      >
+                        <Trophy className="w-3 h-3" />
+                        Finale = Bonus
+                      </motion.span>
+                    )}
+                    {(room.settings.bonusRoundChance ?? 0) > 0 && (
+                      <motion.span 
+                        key={room.settings.bonusRoundChance}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 flex items-center gap-1"
+                      >
+                        <Percent className="w-3 h-3" />
+                        {room.settings.bonusRoundChance}% Chance
+                      </motion.span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </div>
             
-            <div className="relative z-10 inline-flex items-center gap-3 text-muted-foreground">
+            {/* Waiting indicator */}
+            <div className="text-center py-4 glass rounded-2xl relative overflow-hidden">
+              {/* Animated background gradient */}
               <motion.div
-                className="flex gap-1"
-              >
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-2 h-2 rounded-full bg-primary"
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{
-                      duration: 0.6,
-                      repeat: Infinity,
-                      delay: i * 0.15,
-                    }}
-                  />
-                ))}
-              </motion.div>
-              <span>Warte auf Host...</span>
+                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5"
+                animate={{
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{ duration: 5, repeat: Infinity, ease: 'linear' }}
+                style={{ backgroundSize: '200% 100%' }}
+              />
+              
+              <div className="relative z-10 inline-flex items-center gap-3 text-muted-foreground">
+                <motion.div
+                  className="flex gap-1"
+                >
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-primary"
+                      animate={{ y: [0, -8, 0] }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: Infinity,
+                        delay: i * 0.15,
+                      }}
+                    />
+                  ))}
+                </motion.div>
+                <span>Warte auf Host...</span>
+              </div>
             </div>
           </motion.div>
         )}

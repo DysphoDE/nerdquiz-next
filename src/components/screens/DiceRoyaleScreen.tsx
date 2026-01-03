@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Dices, Crown, Clock, Check, RefreshCw, Sparkles } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { Dices, Crown, Clock, Check, RefreshCw, Sparkles, X } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
 import { getSocket } from '@/lib/socket';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ interface PlayerRollData {
   avatarSeed: string;
   rolls: number[] | null;
   sum: number;
+  isEliminated: boolean;
 }
 
 interface CategorySelectedData {
@@ -92,7 +93,7 @@ function Dice3D({
         "relative rounded-lg shadow-xl",
         "bg-gradient-to-br from-white via-gray-100 to-gray-200",
         "border-2 border-gray-300",
-        isLarge ? "w-12 h-12 sm:w-16 sm:h-16" : "w-9 h-9 sm:w-11 sm:h-11"
+        isLarge ? "w-10 h-10 sm:w-14 sm:h-14" : "w-8 h-8 sm:w-10 sm:h-10"
       )}
       style={{
         boxShadow: rolling 
@@ -103,7 +104,7 @@ function Dice3D({
       }}
     >
       {/* Dice dots */}
-      <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 p-2 sm:p-2.5">
+      <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 p-1.5 sm:p-2">
         {[0, 1, 2].map((row) =>
           [0, 1, 2].map((col) => {
             const hasDot = dots.some(([r, c]) => r === row && c === col);
@@ -116,7 +117,7 @@ function Dice3D({
                     transition={{ delay: delay + 0.05 * (row * 3 + col) }}
                     className={cn(
                       "rounded-full bg-gray-800 shadow-inner",
-                      isLarge ? "w-2 h-2 sm:w-3 sm:h-3" : "w-1.5 h-1.5 sm:w-2 sm:h-2"
+                      isLarge ? "w-1.5 h-1.5 sm:w-2.5 sm:h-2.5" : "w-1 h-1 sm:w-1.5 sm:h-1.5"
                     )}
                     style={{
                       boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
@@ -140,6 +141,138 @@ function Dice3D({
   );
 }
 
+// Player card component for grid layout
+function PlayerCard({
+  player,
+  isMe,
+  isWinner,
+  isTied,
+  needsToRoll,
+  phase,
+}: {
+  player: PlayerRollData;
+  isMe: boolean;
+  isWinner: boolean;
+  isTied: boolean;
+  needsToRoll: boolean;
+  phase: string;
+}) {
+  const hasRolledDice = player.rolls !== null;
+  
+  return (
+    <motion.div
+      layout
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ 
+        scale: player.isEliminated ? 0.9 : 1, 
+        opacity: player.isEliminated ? 0.4 : 1,
+      }}
+      exit={{ scale: 0, opacity: 0 }}
+      transition={{ 
+        type: 'spring',
+        stiffness: 400,
+        damping: 30,
+      }}
+      className={cn(
+        "relative flex flex-col items-center p-3 sm:p-4 rounded-xl glass",
+        "transition-all duration-300",
+        isWinner && 'ring-2 ring-emerald-500 bg-emerald-500/20',
+        isMe && !isWinner && 'ring-2 ring-primary',
+        isTied && phase === 'reroll' && 'ring-2 ring-yellow-500',
+        needsToRoll && 'ring-2 ring-emerald-400',
+        player.isEliminated && 'grayscale'
+      )}
+    >
+      {/* Winner Crown */}
+      <AnimatePresence>
+        {isWinner && (
+          <motion.div
+            initial={{ y: -20, opacity: 0, scale: 0 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -20, opacity: 0 }}
+            className="absolute -top-3 left-1/2 -translate-x-1/2"
+          >
+            <Crown className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500 drop-shadow-lg" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Eliminated indicator */}
+      {player.isEliminated && (
+        <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+          <X className="w-3 h-3 text-white" />
+        </div>
+      )}
+
+      {/* Avatar */}
+      <img
+        src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=${isWinner ? 'superHappy' : player.isEliminated ? 'sad' : hasRolledDice ? 'hopeful' : 'neutral'}`}
+        alt=""
+        className={cn(
+          "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-muted mb-2",
+          isWinner && 'border-2 border-emerald-500'
+        )}
+      />
+
+      {/* Name */}
+      <p className="font-bold text-xs sm:text-sm truncate max-w-full text-center mb-2">
+        {player.name}
+        {isMe && <span className="text-primary ml-1">(Du)</span>}
+      </p>
+
+      {/* Dice */}
+      <div className="flex gap-1.5 sm:gap-2 justify-center min-h-[40px] sm:min-h-[48px] items-center">
+        {hasRolledDice ? (
+          <>
+            <Dice3D value={player.rolls![0]} isRolling={false} delay={0} size="normal" />
+            <Dice3D value={player.rolls![1]} isRolling={false} delay={0.1} size="normal" />
+          </>
+        ) : (
+          <div className="flex gap-1.5 opacity-40">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-md bg-muted/50 flex items-center justify-center text-sm border border-dashed border-muted-foreground/30">
+              ?
+            </div>
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-md bg-muted/50 flex items-center justify-center text-sm border border-dashed border-muted-foreground/30">
+              ?
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Sum */}
+      <AnimatePresence>
+        {hasRolledDice && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className={cn(
+              "mt-2 px-3 py-1 rounded-full font-mono font-bold text-sm sm:text-base",
+              isWinner 
+                ? 'bg-emerald-500 text-white' 
+                : 'bg-muted text-muted-foreground'
+            )}
+          >
+            = {player.sum}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Pulsing indicator for current roller */}
+      {needsToRoll && !hasRolledDice && (
+        <motion.div
+          className="absolute inset-0 rounded-xl border-2 border-emerald-400"
+          animate={{ 
+            opacity: [0.5, 1, 0.5],
+            scale: [1, 1.02, 1],
+          }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+      )}
+    </motion.div>
+  );
+}
+
 export function DiceRoyaleScreen() {
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
@@ -148,12 +281,16 @@ export function DiceRoyaleScreen() {
   const [playerRolls, setPlayerRolls] = useState<Map<string, number[] | null>>(new Map());
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [tiedPlayerIds, setTiedPlayerIds] = useState<string[] | null>(null);
+  const [eliminatedPlayerIds, setEliminatedPlayerIds] = useState<Set<string>>(new Set());
   const [hasRolled, setHasRolled] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
   const [timeLeft, setTimeLeft] = useState(15);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [revealedCategory, setRevealedCategory] = useState<CategorySelectedData | null>(null);
   const [round, setRound] = useState(1);
+  
+  // Track initial player order to maintain stable positions
+  const initialPlayerOrderRef = useRef<string[]>([]);
 
   const categories = room?.votingCategories || [];
   const players = room?.players || [];
@@ -164,22 +301,39 @@ export function DiceRoyaleScreen() {
     if (phase !== 'rolling') return false;
     if (hasRolled) return false;
     if (tiedPlayerIds && !tiedPlayerIds.includes(playerId || '')) return false;
+    if (eliminatedPlayerIds.has(playerId || '')) return false;
     return true;
-  }, [phase, hasRolled, tiedPlayerIds, playerId]);
+  }, [phase, hasRolled, tiedPlayerIds, playerId, eliminatedPlayerIds]);
 
-  // Build player roll data for display
+  // Build player roll data for display - maintain stable order
   const playerRollData: PlayerRollData[] = useMemo(() => {
-    return players.map(p => {
-      const rolls = playerRolls.get(p.id) || null;
-      return {
-        playerId: p.id,
-        name: p.name,
-        avatarSeed: p.avatarSeed,
-        rolls,
-        sum: rolls ? rolls[0] + rolls[1] : 0,
-      };
-    }).sort((a, b) => b.sum - a.sum);
-  }, [players, playerRolls]);
+    // Use initial order if set, otherwise use current players
+    const orderToUse = initialPlayerOrderRef.current.length > 0 
+      ? initialPlayerOrderRef.current 
+      : players.map(p => p.id);
+    
+    return orderToUse
+      .map(pid => {
+        const player = players.find(p => p.id === pid);
+        if (!player) return null;
+        const rolls = playerRolls.get(pid) || null;
+        return {
+          playerId: pid,
+          name: player.name,
+          avatarSeed: player.avatarSeed,
+          rolls,
+          sum: rolls ? rolls[0] + rolls[1] : 0,
+          isEliminated: eliminatedPlayerIds.has(pid),
+        };
+      })
+      .filter((p): p is PlayerRollData => p !== null);
+  }, [players, playerRolls, eliminatedPlayerIds]);
+
+  // Active (non-eliminated) players for display
+  const activePlayers = useMemo(() => 
+    playerRollData.filter(p => !p.isEliminated),
+    [playerRollData]
+  );
 
   // Socket event listeners
   useEffect(() => {
@@ -194,9 +348,13 @@ export function DiceRoyaleScreen() {
       setHasRolled(false);
       setWinnerId(null);
       setTiedPlayerIds(null);
+      setEliminatedPlayerIds(new Set());
       setRound(1);
       setSelectedCategory(null);
       setRevealedCategory(null);
+      
+      // Store initial player order for stable positioning
+      initialPlayerOrderRef.current = data.players.map(p => p.id);
     };
 
     const handleRoyaleReady = () => {
@@ -221,7 +379,20 @@ export function DiceRoyaleScreen() {
       setTiedPlayerIds(data.tiedPlayerIds);
       setRound(data.round);
       setPhase('reroll');
+      
+      // Mark non-tied players as eliminated
+      setEliminatedPlayerIds(prev => {
+        const next = new Set(prev);
+        players.forEach(p => {
+          if (!data.tiedPlayerIds.includes(p.id)) {
+            next.add(p.id);
+          }
+        });
+        return next;
+      });
+      
       setTimeout(() => {
+        // Clear rolls only for tied players
         setPlayerRolls(prev => {
           const next = new Map(prev);
           data.tiedPlayerIds.forEach(pid => next.set(pid, null));
@@ -266,7 +437,7 @@ export function DiceRoyaleScreen() {
       socket.off('dice_royale_pick', handleRoyalePick);
       socket.off('category_selected', handleCategorySelected);
     };
-  }, [playerId]);
+  }, [playerId, players]);
 
   // Timer for picking phase
   useEffect(() => {
@@ -342,29 +513,27 @@ export function DiceRoyaleScreen() {
     );
   }
 
-  // Calculate circle positions for players
-  const getCirclePosition = (index: number, total: number, radius: number) => {
-    // Start from top (-90deg) and go clockwise
-    const angle = (-90 + (360 / total) * index) * (Math.PI / 180);
-    return {
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
-    };
+  // Determine grid columns based on active player count
+  const getGridCols = (count: number) => {
+    if (count <= 2) return 'grid-cols-2';
+    if (count <= 3) return 'grid-cols-3';
+    if (count <= 4) return 'grid-cols-2 sm:grid-cols-4';
+    if (count <= 6) return 'grid-cols-2 sm:grid-cols-3';
+    return 'grid-cols-2 sm:grid-cols-4';
   };
 
-  const playerCount = playerRollData.length;
-  // Dynamic radius based on player count - smaller for mobile
-  const baseRadius = playerCount <= 3 ? 90 : playerCount <= 5 ? 110 : 130;
+  // Display either active players only (during tiebreaker) or all players
+  const displayPlayers = tiedPlayerIds && phase !== 'result' ? activePlayers : playerRollData;
 
   return (
     <motion.main
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen flex flex-col p-4"
+      className="min-h-screen flex flex-col p-4 sm:p-6"
     >
       {/* Header */}
-      <div className="text-center py-4">
+      <div className="text-center py-4 sm:py-6">
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -384,8 +553,8 @@ export function DiceRoyaleScreen() {
           animate={{ y: 0, opacity: 1 }}
           className="text-xl sm:text-2xl md:text-3xl font-black"
         >
-          {phase === 'rolling' && (tiedPlayerIds ? 'Gleichstand! Nochmal würfeln!' : 'Alle würfeln!')}
-          {phase === 'reroll' && 'Gleichstand! Nochmal würfeln!'}
+          {phase === 'rolling' && (tiedPlayerIds ? 'Stechen!' : 'Alle würfeln!')}
+          {phase === 'reroll' && 'Gleichstand!'}
           {phase === 'result' && `${players.find(p => p.id === winnerId)?.name} gewinnt!`}
           {phase === 'picking' && 'Der Sieger wählt...'}
         </motion.h1>
@@ -394,164 +563,92 @@ export function DiceRoyaleScreen() {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/20 text-yellow-400 text-sm"
+            className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 text-yellow-400 text-sm"
           >
             <RefreshCw className="w-4 h-4 animate-spin" />
-            <span>Nur {tiedPlayerIds?.length} Spieler würfeln erneut</span>
+            <span>{tiedPlayerIds?.length} Spieler würfeln nochmal</span>
           </motion.div>
         )}
       </div>
 
-      {/* Circle Arena */}
-      <div className="flex-1 flex flex-col items-center justify-center overflow-hidden px-2">
-        <div 
-          className="relative scale-[0.75] sm:scale-100"
-          style={{ 
-            width: `${baseRadius * 2 + 110}px`, 
-            height: `${baseRadius * 2 + 110}px`,
+      {/* Players Grid */}
+      <div className="flex-1 flex flex-col items-center justify-center px-2">
+        {/* Center decoration */}
+        <motion.div
+          animate={{ 
+            scale: [1, 1.1, 1],
+            rotate: [0, 5, -5, 0],
           }}
+          transition={{ 
+            duration: 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+          className="text-4xl sm:text-5xl mb-6"
         >
-          {/* Center decoration */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <motion.div
-              animate={{ 
-                scale: [1, 1.05, 1],
-                rotate: [0, 360],
-              }}
-              transition={{ 
-                scale: { duration: 2, repeat: Infinity },
-                rotate: { duration: 20, repeat: Infinity, ease: 'linear' },
-              }}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-emerald-500/30 flex items-center justify-center"
-            >
-              <motion.div
-                animate={{ rotate: [0, -360] }}
-                transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-                className="text-2xl sm:text-3xl"
-              >
-                🎲
-              </motion.div>
-            </motion.div>
-          </div>
+          🎲
+        </motion.div>
 
-          {/* Players in circle */}
-          {playerRollData.map((player, index) => {
-            const isMe = player.playerId === playerId;
-            const isWinnerPlayer = player.playerId === winnerId;
-            const isTied = tiedPlayerIds?.includes(player.playerId);
-            const needsToRoll = isTied && phase === 'rolling';
-            const hasRolledDice = player.rolls !== null;
-            
-            const pos = getCirclePosition(index, playerCount, baseRadius);
-
-            return (
-              <motion.div
-                key={player.playerId}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ 
-                  scale: 1, 
-                  opacity: 1,
-                  x: pos.x,
-                  y: pos.y,
-                }}
-                transition={{ 
-                  delay: index * 0.1,
-                  type: 'spring',
-                  stiffness: 300,
-                  damping: 25,
-                }}
-                className="absolute left-1/2 top-1/2"
-                style={{
-                  marginLeft: '-50px',
-                  marginTop: '-55px',
-                }}
-              >
-                <motion.div
-                  animate={isWinnerPlayer && phase === 'result' ? {
-                    scale: [1, 1.05, 1],
-                  } : {}}
-                  transition={{ duration: 0.5, repeat: isWinnerPlayer ? Infinity : 0, repeatDelay: 1 }}
-                  className={cn(
-                    "relative flex flex-col items-center p-2 rounded-xl glass w-[100px]",
-                    "transition-all duration-300",
-                    isWinnerPlayer && 'ring-2 ring-emerald-500 bg-emerald-500/20',
-                    isMe && !isWinnerPlayer && 'ring-2 ring-primary',
-                    isTied && phase === 'reroll' && 'ring-2 ring-yellow-500',
-                    needsToRoll && 'ring-2 ring-emerald-400 animate-pulse'
-                  )}
-                >
-                  {/* Winner Crown */}
-                  <AnimatePresence>
-                    {isWinnerPlayer && (
-                      <motion.div
-                        initial={{ y: -20, opacity: 0, scale: 0 }}
-                        animate={{ y: 0, opacity: 1, scale: 1 }}
-                        exit={{ y: -20, opacity: 0 }}
-                        className="absolute -top-3 left-1/2 -translate-x-1/2"
-                      >
-                        <Crown className="w-5 h-5 text-emerald-500 drop-shadow-lg" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Avatar */}
-                  <img
-                    src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=${isWinnerPlayer ? 'superHappy' : hasRolledDice ? 'hopeful' : 'neutral'}`}
-                    alt=""
-                    className={cn(
-                      "w-9 h-9 rounded-full bg-muted mb-1",
-                      isWinnerPlayer && 'border-2 border-emerald-500'
-                    )}
+        <LayoutGroup>
+          <motion.div 
+            layout
+            className={cn(
+              "grid gap-3 sm:gap-4 w-full max-w-3xl mx-auto",
+              getGridCols(displayPlayers.length)
+            )}
+          >
+            <AnimatePresence mode="popLayout">
+              {displayPlayers.map((player) => {
+                const isMe = player.playerId === playerId;
+                const isWinnerPlayer = player.playerId === winnerId;
+                const isTied = tiedPlayerIds?.includes(player.playerId) ?? false;
+                const needsToRoll = (tiedPlayerIds ? isTied : true) && phase === 'rolling' && !player.isEliminated;
+                
+                return (
+                  <PlayerCard
+                    key={player.playerId}
+                    player={player}
+                    isMe={isMe}
+                    isWinner={isWinnerPlayer}
+                    isTied={isTied}
+                    needsToRoll={needsToRoll}
+                    phase={phase}
                   />
+                );
+              })}
+            </AnimatePresence>
+          </motion.div>
+        </LayoutGroup>
 
-                  {/* Name */}
-                  <p className="font-bold text-[10px] truncate w-full text-center mb-1">
-                    {player.name}
-                    {isMe && <span className="text-primary ml-0.5">(Du)</span>}
-                  </p>
-
-                  {/* Dice - compact */}
-                  <div className="flex gap-1 justify-center h-10 items-center">
-                    {hasRolledDice ? (
-                      <>
-                        <Dice3D value={player.rolls![0]} isRolling={false} delay={0} size="normal" />
-                        <Dice3D value={player.rolls![1]} isRolling={false} delay={0.1} size="normal" />
-                      </>
-                    ) : (
-                      <div className="flex gap-1 opacity-40">
-                        <div className="w-9 h-9 rounded-md bg-muted/50 flex items-center justify-center text-sm border border-dashed border-muted-foreground/30">
-                          ?
-                        </div>
-                        <div className="w-9 h-9 rounded-md bg-muted/50 flex items-center justify-center text-sm border border-dashed border-muted-foreground/30">
-                          ?
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sum */}
-                  <AnimatePresence>
-                    {hasRolledDice && (
-                      <motion.div
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        className={cn(
-                          "mt-1 px-2 py-0.5 rounded-full font-mono font-bold text-sm",
-                          isWinnerPlayer 
-                            ? 'bg-emerald-500 text-white' 
-                            : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        = {player.sum}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+        {/* Eliminated players indicator during tiebreaker */}
+        {tiedPlayerIds && eliminatedPlayerIds.size > 0 && phase !== 'result' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 flex flex-wrap gap-2 justify-center"
+          >
+            <span className="text-xs text-muted-foreground mr-2">Ausgeschieden:</span>
+            {Array.from(eliminatedPlayerIds).map(pid => {
+              const player = players.find(p => p.id === pid);
+              if (!player) return null;
+              return (
+                <motion.div
+                  key={pid}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/50 text-muted-foreground text-xs"
+                >
+                  <img
+                    src={`https://api.dicebear.com/9.x/dylan/svg?seed=${encodeURIComponent(player.avatarSeed)}&mood=sad`}
+                    alt=""
+                    className="w-5 h-5 rounded-full bg-muted grayscale"
+                  />
+                  <span className="line-through">{player.name}</span>
                 </motion.div>
-              </motion.div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </motion.div>
+        )}
       </div>
 
       {/* Roll Button */}
@@ -561,14 +658,14 @@ export function DiceRoyaleScreen() {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
-            className="text-center py-4"
+            className="text-center py-4 sm:py-6"
           >
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleRoll}
               disabled={!canRoll}
-              className="px-10 py-5 rounded-2xl font-black text-xl sm:text-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30"
+              className="px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-lg sm:text-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30"
             >
               {isRolling ? (
                 <motion.span
@@ -588,7 +685,7 @@ export function DiceRoyaleScreen() {
 
       {/* Waiting message */}
       <AnimatePresence>
-        {phase === 'rolling' && hasRolled && (
+        {phase === 'rolling' && hasRolled && !winnerId && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -611,7 +708,7 @@ export function DiceRoyaleScreen() {
           >
             <span className="inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-yellow-500" />
-              Warte auf die Stecher...
+              Warte auf das Stechen...
             </span>
           </motion.p>
         )}
@@ -627,9 +724,9 @@ export function DiceRoyaleScreen() {
             className="pb-4"
           >
             {/* Timer */}
-            <div className="text-center mb-3">
+            <div className="text-center mb-4">
               <span className={cn(
-                "inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm",
+                "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium",
                 timeLeft <= 5 ? 'bg-red-500/20 text-red-400' : 'glass'
               )}>
                 <Clock className="w-4 h-4" />
@@ -666,8 +763,8 @@ export function DiceRoyaleScreen() {
                         <Check className="w-3 h-3 text-black" />
                       </motion.div>
                     )}
-                    <span className="text-2xl block mb-1">{cat.icon}</span>
-                    <span className="font-bold text-xs">{cat.name}</span>
+                    <span className="text-2xl sm:text-3xl block mb-1">{cat.icon}</span>
+                    <span className="font-bold text-xs sm:text-sm">{cat.name}</span>
                   </motion.button>
                 );
               })}
