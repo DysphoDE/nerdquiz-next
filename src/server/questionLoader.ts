@@ -3,6 +3,12 @@
  * 
  * Lädt Fragen aus der Datenbank für den Game-Server.
  * Falls keine DB-Verbindung besteht, fällt es auf die JSON-Files zurück.
+ * 
+ * RANDOMIZATION IMPROVEMENTS (2025-01):
+ * - Implemented Fisher-Yates shuffle for uniform distribution
+ * - Removed createdAt sorting bias (was only selecting newest questions)
+ * - Loads ALL questions from category for proper randomization
+ * - Optimized Collective List queries with skip/take instead of loading all
  */
 
 import { PrismaClient, QuestionType } from '@prisma/client';
@@ -39,6 +45,24 @@ interface CategoryInfo {
   name: string;
   icon: string;
   questionCount: number;
+}
+
+// ============================================
+// SHUFFLE UTILITY (Fisher-Yates Algorithm)
+// ============================================
+
+/**
+ * Fisher-Yates Shuffle Algorithm
+ * Provides uniform distribution for array shuffling
+ * Much better than .sort(() => Math.random() - 0.5)
+ */
+function fisherYatesShuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
@@ -136,8 +160,9 @@ function getJsonRandomQuestions(categoryId: string, count: number): GameQuestion
   const choiceQuestions = allQuestions.filter(q => q.answers !== undefined && q.answers.length > 0);
   const estimationQuestions = allQuestions.filter(q => q.correctAnswer !== undefined);
   
-  const shuffledChoice = [...choiceQuestions].sort(() => Math.random() - 0.5);
-  const shuffledEstimation = [...estimationQuestions].sort(() => Math.random() - 0.5);
+  // Use Fisher-Yates shuffle for better randomization
+  const shuffledChoice = fisherYatesShuffle(choiceQuestions);
+  const shuffledEstimation = fisherYatesShuffle(estimationQuestions);
   
   const selectedChoice = shuffledChoice.slice(0, count - 1);
   const selectedEstimation = shuffledEstimation.slice(0, 1);
@@ -212,19 +237,14 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
     ...(excludeIds.length > 0 && { id: { notIn: excludeIds } }),
   };
 
-  // Get questions with random ordering
-  // PostgreSQL random ordering
+  // Get ALL questions from category (for proper randomization)
   // NOTE: TRUE_FALSE questions are excluded until properly implemented
   let choiceQuestions = await prisma.question.findMany({
     where: {
       ...baseFilter,
       type: 'MULTIPLE_CHOICE', // Only MULTIPLE_CHOICE for now (TRUE_FALSE not yet implemented)
     },
-    orderBy: {
-      // Use raw SQL for random - this is a workaround
-      createdAt: 'desc',
-    },
-    take: count * 2, // Get more than needed for shuffling
+    // No orderBy needed - we'll shuffle in JavaScript with Fisher-Yates
   });
 
   let estimationQuestions = await prisma.question.findMany({
@@ -232,7 +252,6 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
       ...baseFilter,
       type: 'ESTIMATION',
     },
-    take: 5,
   });
 
   // If not enough questions and we were excluding, try without exclusion
@@ -244,7 +263,6 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
         isActive: true,
         type: 'MULTIPLE_CHOICE', // Only MULTIPLE_CHOICE for now
       },
-      take: count * 2,
     });
     estimationQuestions = await prisma.question.findMany({
       where: {
@@ -252,13 +270,12 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
         isActive: true,
         type: 'ESTIMATION',
       },
-      take: 5,
     });
   }
 
-  // Shuffle in JS
-  const shuffledChoice = [...choiceQuestions].sort(() => Math.random() - 0.5);
-  const shuffledEstimation = [...estimationQuestions].sort(() => Math.random() - 0.5);
+  // Use Fisher-Yates shuffle for uniform random distribution
+  const shuffledChoice = fisherYatesShuffle(choiceQuestions);
+  const shuffledEstimation = fisherYatesShuffle(estimationQuestions);
 
   // Take (count - 1) choice + 1 estimation
   const selectedChoice = shuffledChoice.slice(0, count - 1);
@@ -299,7 +316,7 @@ async function getDbRandomQuestions(categorySlug: string, count: number, exclude
     if (isMultipleChoiceContent(content)) {
       // Shuffle answers and track correct index
       const allAnswers = [content.correctAnswer, ...content.incorrectAnswers];
-      const shuffledAnswers = [...allAnswers].sort(() => Math.random() - 0.5);
+      const shuffledAnswers = fisherYatesShuffle(allAnswers);
       const correctIndex = shuffledAnswers.indexOf(content.correctAnswer);
 
       return {
@@ -356,12 +373,74 @@ export async function getCategoryList(): Promise<CategoryInfo[]> {
 }
 
 /**
- * Get random categories for voting
+ * Get random categories for voting with smart prioritization
+ * 
+ * HYBRID APPROACH:
+ * - Unused categories get 3x weight (higher chance but not overwhelming)
+ * - Used categories still have a chance but are less likely
+ * - Ensures variety while maintaining some randomness
+ * - Auto-reset when 80% of categories have been used
+ * 
+ * @param count - Number of categories to return
+ * @param usedCategoryIds - Set of already played category IDs
  */
-export async function getRandomCategoriesForVoting(count: number = 6): Promise<CategoryInfo[]> {
+export async function getRandomCategoriesForVoting(
+  count: number = 6, 
+  usedCategoryIds: Set<string> = new Set()
+): Promise<CategoryInfo[]> {
   const allCategories = await getCategoryList();
-  const shuffled = [...allCategories].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+  
+  // Auto-reset if most categories have been used (80% threshold)
+  if (usedCategoryIds.size >= allCategories.length * 0.8 && allCategories.length > 5) {
+    console.log(`♻️ ${usedCategoryIds.size}/${allCategories.length} categories used, resetting pool for variety`);
+    usedCategoryIds.clear();
+  }
+  
+  // Separate into unused (fresh) and used categories
+  const unusedCategories = allCategories.filter(c => !usedCategoryIds.has(c.id));
+  const usedCategories = allCategories.filter(c => usedCategoryIds.has(c.id));
+  
+  // Weighted selection: unused categories get 3x the weight
+  const UNUSED_WEIGHT = 3;
+  const USED_WEIGHT = 1;
+  
+  // Build weighted array
+  const weightedPool: CategoryInfo[] = [];
+  
+  // Add unused categories with higher weight (5x)
+  for (const cat of unusedCategories) {
+    for (let i = 0; i < UNUSED_WEIGHT; i++) {
+      weightedPool.push(cat);
+    }
+  }
+  
+  // Add used categories with lower weight (1x)
+  for (const cat of usedCategories) {
+    for (let i = 0; i < USED_WEIGHT; i++) {
+      weightedPool.push(cat);
+    }
+  }
+  
+  // Shuffle the weighted pool
+  const shuffled = fisherYatesShuffle(weightedPool);
+  
+  // Select unique categories (remove duplicates from weighting)
+  const selected: CategoryInfo[] = [];
+  const selectedIds = new Set<string>();
+  
+  for (const cat of shuffled) {
+    if (!selectedIds.has(cat.id)) {
+      selected.push(cat);
+      selectedIds.add(cat.id);
+      
+      if (selected.length >= count) {
+        break;
+      }
+    }
+  }
+  
+  // Final shuffle to randomize order
+  return fisherYatesShuffle(selected);
 }
 
 /**
@@ -432,8 +511,8 @@ export async function getRandomBonusRoundQuestion(excludeIds: string[] = []): Pr
   }
 
   try {
-    // Get all active COLLECTIVE_LIST questions, excluding already used ones
-    let questions = await prisma.question.findMany({
+    // Get count of available questions first (more efficient)
+    const availableCount = await prisma.question.count({
       where: {
         type: 'COLLECTIVE_LIST',
         isActive: true,
@@ -441,24 +520,45 @@ export async function getRandomBonusRoundQuestion(excludeIds: string[] = []): Pr
       },
     });
 
-    // If all questions have been used, reset and use all available
-    if (questions.length === 0 && excludeIds.length > 0) {
+    // If no questions available with exclusions, try without
+    let finalExcludeIds = excludeIds;
+    let questionCount = availableCount;
+    
+    if (availableCount === 0 && excludeIds.length > 0) {
       console.log('♻️ All bonus questions used, resetting pool');
-      questions = await prisma.question.findMany({
+      questionCount = await prisma.question.count({
         where: {
           type: 'COLLECTIVE_LIST',
           isActive: true,
         },
       });
+      finalExcludeIds = [];
     }
 
-    if (questions.length === 0) {
+    if (questionCount === 0) {
       console.warn('⚠️ No COLLECTIVE_LIST questions found in database');
       return null;
     }
 
-    // Pick a random one
-    const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
+    // Pick a random offset instead of loading all questions
+    const randomOffset = Math.floor(Math.random() * questionCount);
+    
+    const questions = await prisma.question.findMany({
+      where: {
+        type: 'COLLECTIVE_LIST',
+        isActive: true,
+        ...(finalExcludeIds.length > 0 && { id: { notIn: finalExcludeIds } }),
+      },
+      skip: randomOffset,
+      take: 1,
+    });
+
+    if (questions.length === 0) {
+      console.warn('⚠️ Failed to fetch bonus question');
+      return null;
+    }
+
+    const randomQuestion = questions[0];
     const content = randomQuestion.content as any;
 
     if (!content || !content.items || !Array.isArray(content.items)) {

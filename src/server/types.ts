@@ -221,6 +221,7 @@ export interface GameState {
   wheelSelectedIndex: number | null;
   usedQuestionIds: Set<string>;
   usedBonusQuestionIds: Set<string>;
+  usedCategoryIds: Set<string>; // Track played categories for better variety
   rematchVotes: Map<string, 'yes' | 'no'>;
   // Game Statistics (tracked during gameplay)
   statistics: GameStatistics;
@@ -398,6 +399,7 @@ export function createInitialGameState(): GameState {
     wheelSelectedIndex: null,
     usedQuestionIds: new Set(),
     usedBonusQuestionIds: new Set(),
+    usedCategoryIds: new Set(),
     rematchVotes: new Map(),
     statistics: createInitialGameStatistics(),
   };

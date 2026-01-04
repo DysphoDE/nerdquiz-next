@@ -43,9 +43,10 @@ const dev = process.env.NODE_ENV !== 'production';
 
 /**
  * Lädt zufällige Kategorien für die Auswahl
+ * Mit Hybrid-Priorisierung: Unbenutzte Kategorien werden bevorzugt
  */
-export async function getRandomCategoriesForVoting(count: number = 8): Promise<CategoryInfo[]> {
-  return questionLoader.getRandomCategoriesForVoting(count);
+export async function getRandomCategoriesForVoting(room: GameRoom, count: number = 8): Promise<CategoryInfo[]> {
+  return questionLoader.getRandomCategoriesForVoting(count, room.state.usedCategoryIds);
 }
 
 /**
@@ -72,6 +73,23 @@ export async function getQuestionsForRoom(
  */
 export async function getCategoryData(categoryId: string): Promise<{ name: string; icon: string } | null> {
   return questionLoader.getCategoryData(categoryId);
+}
+
+/**
+ * Setzt die ausgewählte Kategorie und lädt Fragen
+ * Trackt die Kategorie automatisch als "benutzt" für bessere Vielfalt in zukünftigen Runden
+ */
+async function selectCategoryAndLoadQuestions(
+  room: GameRoom,
+  categoryId: string,
+  io: SocketServer
+): Promise<void> {
+  room.state.selectedCategory = categoryId;
+  room.state.usedCategoryIds.add(categoryId); // Track category as used
+  room.state.roundQuestions = await getQuestionsForRoom(room, categoryId, room.settings.questionsPerRound);
+  room.state.currentQuestionIndex = 0;
+  
+  console.log(`📂 Category selected: ${categoryId} (${room.state.usedCategoryIds.size} categories used total)`);
 }
 
 // ============================================
@@ -170,9 +188,7 @@ export async function finalizeCategoryVoting(room: GameRoom, io: SocketServer): 
     ? winners[Math.floor(Math.random() * winners.length)]
     : room.state.votingCategories[Math.floor(Math.random() * room.state.votingCategories.length)]?.id;
 
-  room.state.selectedCategory = selectedCategoryId;
-  room.state.roundQuestions = await getQuestionsForRoom(room, selectedCategoryId, room.settings.questionsPerRound);
-  room.state.currentQuestionIndex = 0;
+  await selectCategoryAndLoadQuestions(room, selectedCategoryId, io);
 
   const categoryData = await getCategoryData(selectedCategoryId);
   
@@ -276,9 +292,7 @@ export async function finalizeWheelSelection(room: GameRoom, io: SocketServer, c
   room.state.phase = 'category_announcement'; // Blockiert weitere Aufrufe
   
   const roomCode = room.code;
-  room.state.selectedCategory = categoryId;
-  room.state.roundQuestions = await getQuestionsForRoom(room, categoryId, room.settings.questionsPerRound);
-  room.state.currentQuestionIndex = 0;
+  await selectCategoryAndLoadQuestions(room, categoryId, io);
   room.state.wheelSelectedIndex = null;
 
   const categoryData = await getCategoryData(categoryId);
@@ -335,9 +349,7 @@ export async function finalizeLosersPick(room: GameRoom, io: SocketServer, categ
   }
   room.state.phase = 'category_announcement'; // Blockiert weitere Aufrufe
   
-  room.state.selectedCategory = categoryId;
-  room.state.roundQuestions = await getQuestionsForRoom(room, categoryId, room.settings.questionsPerRound);
-  room.state.currentQuestionIndex = 0;
+  await selectCategoryAndLoadQuestions(room, categoryId, io);
 
   const categoryData = await getCategoryData(categoryId);
   
@@ -573,9 +585,7 @@ export async function finalizeDiceRoyalePick(room: GameRoom, io: SocketServer, c
   }
   room.state.phase = 'category_announcement'; // Blockiert weitere Aufrufe
   
-  room.state.selectedCategory = categoryId;
-  room.state.roundQuestions = await getQuestionsForRoom(room, categoryId, room.settings.questionsPerRound);
-  room.state.currentQuestionIndex = 0;
+  await selectCategoryAndLoadQuestions(room, categoryId, io);
 
   const categoryData = await getCategoryData(categoryId);
   const winner = room.state.diceRoyale?.winnerId ? room.players.get(room.state.diceRoyale.winnerId) : null;
@@ -908,9 +918,7 @@ export async function finalizeRPSDuelPick(room: GameRoom, io: SocketServer, cate
   }
   room.state.phase = 'category_announcement'; // Blockiert weitere Aufrufe
   
-  room.state.selectedCategory = categoryId;
-  room.state.roundQuestions = await getQuestionsForRoom(room, categoryId, room.settings.questionsPerRound);
-  room.state.currentQuestionIndex = 0;
+  await selectCategoryAndLoadQuestions(room, categoryId, io);
 
   const categoryData = await getCategoryData(categoryId);
   const winner = room.state.rpsDuel?.winnerId ? room.players.get(room.state.rpsDuel.winnerId) : null;

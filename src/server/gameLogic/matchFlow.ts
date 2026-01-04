@@ -121,7 +121,7 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
   // === NORMALE RUNDE ===
   const mode = selectCategoryMode(room);
   room.state.categorySelectionMode = mode;
-  room.state.votingCategories = await getRandomCategoriesForVoting(8);
+  room.state.votingCategories = await getRandomCategoriesForVoting(room, 8);
   room.state.categoryVotes = new Map();
   room.state.selectedCategory = null;
   room.state.loserPickPlayerId = null;
