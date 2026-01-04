@@ -48,6 +48,7 @@ import {
 import {
   handleBonusRoundAnswer,
   handleBonusRoundSkip,
+  handleBonusRoundBuzz,
   startBonusRound,
 } from './gameLogic/bonusRound';
 import {
@@ -109,6 +110,8 @@ export function setupSocketHandlers(io: SocketServer): void {
     // === BONUS ROUND ===
     socket.on('bonus_round_submit', handleBonusRoundSubmit(io));
     socket.on('bonus_round_skip', handleBonusRoundSkipEvent(io));
+    socket.on('hot_button_buzz', handleHotButtonBuzz(io));
+    socket.on('hot_button_submit', handleHotButtonSubmit(io));
 
     // === REMATCH ===
     socket.on('vote_rematch', handleVoteRematch(socket, io));
@@ -403,10 +406,14 @@ function handleBonusRoundSubmit(io: SocketServer) {
     if (!room || room.state.phase !== 'bonus_round') return;
     
     const bonusRound = room.state.bonusRound;
-    if (!bonusRound || bonusRound.phase !== 'playing') return;
+    if (!bonusRound) return;
     
-    const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
-    if (data.playerId !== currentPlayerId) return;
+    // Collective List: Only current turn player can answer
+    if (bonusRound.type === 'collective_list') {
+      if (bonusRound.phase !== 'playing') return;
+      const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
+      if (data.playerId !== currentPlayerId) return;
+    }
     
     handleBonusRoundAnswer(room, io, data.playerId, data.answer);
   };
@@ -418,12 +425,36 @@ function handleBonusRoundSkipEvent(io: SocketServer) {
     if (!room || room.state.phase !== 'bonus_round') return;
     
     const bonusRound = room.state.bonusRound;
-    if (!bonusRound || bonusRound.phase !== 'playing') return;
+    if (!bonusRound || bonusRound.type !== 'collective_list' || bonusRound.phase !== 'playing') return;
     
     const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
     if (data.playerId !== currentPlayerId) return;
     
     handleBonusRoundSkip(room, io, data.playerId);
+  };
+}
+
+function handleHotButtonBuzz(io: SocketServer) {
+  return (data: { roomCode: string; playerId: string }) => {
+    const room = getRoom(data.roomCode);
+    if (!room || room.state.phase !== 'bonus_round') return;
+    
+    const bonusRound = room.state.bonusRound;
+    if (!bonusRound || bonusRound.type !== 'hot_button') return;
+    
+    handleBonusRoundBuzz(room, io, data.playerId);
+  };
+}
+
+function handleHotButtonSubmit(io: SocketServer) {
+  return (data: { roomCode: string; playerId: string; answer: string }) => {
+    const room = getRoom(data.roomCode);
+    if (!room || room.state.phase !== 'bonus_round') return;
+    
+    const bonusRound = room.state.bonusRound;
+    if (!bonusRound || bonusRound.type !== 'hot_button') return;
+    
+    handleBonusRoundAnswer(room, io, data.playerId, data.answer);
   };
 }
 
@@ -1068,9 +1099,14 @@ function setupBotHandlers(io: SocketServer) {
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
     const bonusRound = room.state.bonusRound;
-    if (!bonusRound || bonusRound.phase !== 'playing') return;
-    const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
-    if (data.playerId !== currentPlayerId) return;
+    if (!bonusRound) return;
+    
+    if (bonusRound.type === 'collective_list') {
+      if (bonusRound.phase !== 'playing') return;
+      const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
+      if (data.playerId !== currentPlayerId) return;
+    }
+    
     handleBonusRoundAnswer(room, io, data.playerId, data.answer);
   });
 
@@ -1078,10 +1114,26 @@ function setupBotHandlers(io: SocketServer) {
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
     const bonusRound = room.state.bonusRound;
-    if (!bonusRound || bonusRound.phase !== 'playing') return;
+    if (!bonusRound || bonusRound.type !== 'collective_list' || bonusRound.phase !== 'playing') return;
     const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
     if (data.playerId !== currentPlayerId) return;
     handleBonusRoundSkip(room, io, data.playerId);
+  });
+  
+  botManager.registerActionHandler('hot_button_buzz', (data) => {
+    const room = getRoom(data.roomCode);
+    if (!room || room.state.phase !== 'bonus_round') return;
+    const bonusRound = room.state.bonusRound;
+    if (!bonusRound || bonusRound.type !== 'hot_button') return;
+    handleBonusRoundBuzz(room, io, data.playerId);
+  });
+  
+  botManager.registerActionHandler('hot_button_submit', (data) => {
+    const room = getRoom(data.roomCode);
+    if (!room || room.state.phase !== 'bonus_round') return;
+    const bonusRound = room.state.bonusRound;
+    if (!bonusRound || bonusRound.type !== 'hot_button') return;
+    handleHotButtonAnswer(room, io, data.playerId, data.answer);
   });
 }
 

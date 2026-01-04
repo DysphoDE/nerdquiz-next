@@ -108,7 +108,7 @@ export interface RPSDuelState {
 }
 
 // ============================================
-// BONUS ROUND - Collective List
+// BONUS ROUND - COLLECTIVE LIST
 // ============================================
 
 export interface BonusRoundItem {
@@ -121,7 +121,8 @@ export interface BonusRoundItem {
   aliases?: string[]; // Only present for already guessed items (for duplicate detection)
 }
 
-export interface BonusRoundState {
+export interface CollectiveListBonusRound {
+  type: 'collective_list';
   phase: 'intro' | 'playing' | 'finished';
   questionId?: string; // DB question ID for dev-mode editing
   topic: string;
@@ -161,6 +162,51 @@ export interface BonusRoundState {
   fuzzyThreshold: number;
 }
 
+// ============================================
+// BONUS ROUND - HOT BUTTON
+// ============================================
+
+export interface HotButtonBonusRound {
+  type: 'hot_button';
+  phase: 'intro' | 'question_reveal' | 'buzzer_active' | 'answering' | 'result' | 'finished';
+  questionId?: string;
+  topic: string;
+  description?: string;
+  category?: string;
+  categoryIcon?: string;
+  
+  // Question state
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  currentQuestionText: string; // Progressively revealed text
+  isFullyRevealed: boolean;
+  
+  // Buzzer state
+  buzzedPlayerId: string | null;
+  buzzedPlayerName?: string;
+  buzzerTimerEnd: number | null;
+  
+  // Answer state
+  answerTimerEnd: number | null;
+  lastAnswer?: {
+    playerId: string;
+    playerName: string;
+    input: string;
+    correct: boolean;
+    confidence?: number;
+  };
+  
+  // Attempts
+  attemptedPlayerIds: string[];
+  remainingAttempts: number;
+  
+  // Scores
+  playerScores: Record<string, number>; // playerId -> Punkte in dieser Runde
+}
+
+// Union type for all bonus round types
+export type BonusRoundState = CollectiveListBonusRound | HotButtonBonusRound;
+
 export interface GameSettings {
   maxRounds: number;
   questionsPerRound: number;
@@ -183,6 +229,7 @@ export interface RoomState {
   totalQuestions: number;
   currentQuestion: Question | null;
   categorySelectionMode: CategorySelectionMode | null;
+  selectedBonusType: string | null; // 'collective_list' | 'hot_button' für Roulette
   votingCategories: Category[];
   categoryVotes: Record<string, string>;
   selectedCategory: string | null;

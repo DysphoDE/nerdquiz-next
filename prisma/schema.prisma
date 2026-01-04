@@ -50,7 +50,23 @@ model Question {
   // SORTING: { items: string[], labels?: { top: string, bottom: string } }
   // TEXT_INPUT: { acceptedAnswers: string[], caseSensitive?: boolean }
   // MATCHING: { pairs: { clue: string, match: string }[] }
-  // COLLECTIVE_LIST: { topic: string, items: { id: string, display: string, aliases: string[] }[], timePerTurn?: number, fuzzyThreshold?: number }
+  // COLLECTIVE_LIST: { 
+  //   topic: string, 
+  //   description?: string,
+  //   items: { id: string, display: string, aliases: string[], group?: string }[], 
+  //   timePerTurn?: number (default: 15),
+  //   pointsPerCorrect?: number (default: 200),
+  //   fuzzyThreshold?: number (default: 0.85),
+  //   showGroupHeaders?: boolean (default: false)
+  // }
+  // HOT_BUTTON: { 
+  //   correctAnswer: string, 
+  //   acceptedAnswers: string[], 
+  //   revealSpeed?: number (default: 50ms per char),
+  //   pointsCorrect?: number (default: 1500),
+  //   pointsWrong?: number (default: -500),
+  //   speedBonusMultiplier?: number (default: 500)
+  // }
   content      Json
   
   // Medien-Support
@@ -89,6 +105,7 @@ enum QuestionType {
   TEXT_INPUT       // Freitext-Eingabe (für Bildrätsel)
   MATCHING         // Zuordnungsfrage (Zitat → Person)
   COLLECTIVE_LIST  // Bonusrunde: Spieler nennen nacheinander Items aus einer Liste
+  HOT_BUTTON       // Bonusrunde: Buzzer-Runde mit schrittweise aufgebauter Frage
 }
 
 enum Difficulty {

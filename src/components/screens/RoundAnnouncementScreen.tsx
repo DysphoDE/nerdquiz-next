@@ -308,16 +308,14 @@ export function RoundAnnouncementScreen() {
     }
   }, [isBonusRound]);
 
-  // Selected ID - für Bonusrunden nur aus implementierten wählen
+  // Selected ID - für Bonusrunden aus room.selectedBonusType lesen
   const selectedId = useMemo(() => {
     if (isBonusRound) {
-      // Nur aus implementierten Typen wählen
-      return IMPLEMENTED_BONUS_TYPES.length > 0 
-        ? IMPLEMENTED_BONUS_TYPES[0].id 
-        : 'collective_list';
+      // Verwende den vom Server ausgewählten Bonus-Typ
+      return room.selectedBonusType || 'collective_list';
     }
     return categoryMode;
-  }, [isBonusRound, categoryMode]);
+  }, [isBonusRound, categoryMode, room.selectedBonusType]);
   
   // Get config for display after roulette
   const selectedConfig = useMemo(() => {

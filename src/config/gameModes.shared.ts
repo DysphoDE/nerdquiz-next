@@ -21,7 +21,7 @@ export type CategorySelectionMode = typeof CATEGORY_MODE_IDS[number];
 /**
  * Alle verfügbaren Bonusrunden-Typ IDs
  */
-export const BONUS_TYPE_IDS = ['collective_list', 'sorting', 'text_input', 'matching'] as const;
+export const BONUS_TYPE_IDS = ['collective_list', 'hot_button', 'sorting', 'text_input', 'matching'] as const;
 export type BonusRoundType = typeof BONUS_TYPE_IDS[number];
 
 // ============================================
@@ -131,6 +131,15 @@ export const BONUS_ROUND_TYPES_DATA: BonusRoundTypeData[] = [
     color: 'from-amber-500 to-yellow-500',
     description: 'Nennt nacheinander alle Begriffe einer Liste!',
     questionType: 'COLLECTIVE_LIST',
+    isImplemented: true,
+  },
+  {
+    id: 'hot_button',
+    name: 'Hot Button',
+    emoji: '⚡',
+    color: 'from-yellow-500 to-orange-500',
+    description: 'Buzzere und beantworte die Frage so schnell wie möglich!',
+    questionType: 'HOT_BUTTON',
     isImplemented: true,
   },
   {

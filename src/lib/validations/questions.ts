@@ -99,6 +99,18 @@ export const CollectiveListContentSchema = z.object({
   showGroupHeaders: z.boolean().default(false), // Gruppen im Grid anzeigen
 });
 
+/**
+ * Hot Button: Bonusrunde - Buzzer-Runde mit schrittweise aufgebauter Frage
+ * Beispiel: "Wie heißt die Hauptstadt von...?" (wird langsam aufgebaut)
+ */
+export const HotButtonContentSchema = z.object({
+  correctAnswer: z.string().min(1, 'Richtige Antwort angeben'),
+  acceptedAnswers: z
+    .array(z.string().min(1))
+    .min(1, 'Mindestens eine akzeptierte Antwort'),
+  revealSpeed: z.number().min(10).max(200).default(50).optional(), // Millisekunden pro Zeichen
+});
+
 // ============================================
 // TYPE EXPORTS
 // ============================================
@@ -111,6 +123,7 @@ export type TextInputContent = z.infer<typeof TextInputContentSchema>;
 export type MatchingContent = z.infer<typeof MatchingContentSchema>;
 export type CollectiveListContent = z.infer<typeof CollectiveListContentSchema>;
 export type CollectiveListItem = z.infer<typeof CollectiveListItemSchema>;
+export type HotButtonContent = z.infer<typeof HotButtonContentSchema>;
 
 // Union Type
 export type QuestionContent =
@@ -120,7 +133,8 @@ export type QuestionContent =
   | SortingContent
   | TextInputContent
   | MatchingContent
-  | CollectiveListContent;
+  | CollectiveListContent
+  | HotButtonContent;
 
 // ============================================
 // VALIDATION HELPERS
@@ -133,7 +147,8 @@ export type QuestionType =
   | 'SORTING' 
   | 'TEXT_INPUT' 
   | 'MATCHING'
-  | 'COLLECTIVE_LIST';
+  | 'COLLECTIVE_LIST'
+  | 'HOT_BUTTON';
 
 const contentSchemaMap: Record<QuestionType, z.ZodSchema> = {
   MULTIPLE_CHOICE: MultipleChoiceContentSchema,
@@ -143,6 +158,7 @@ const contentSchemaMap: Record<QuestionType, z.ZodSchema> = {
   TEXT_INPUT: TextInputContentSchema,
   MATCHING: MatchingContentSchema,
   COLLECTIVE_LIST: CollectiveListContentSchema,
+  HOT_BUTTON: HotButtonContentSchema,
 };
 
 /**
@@ -220,6 +236,13 @@ export function isCollectiveListContent(content: QuestionContent): content is Co
   return 'topic' in content && 'items' in content && Array.isArray((content as any).items);
 }
 
+/**
+ * Type Guard für Hot Button (Bonusrunde)
+ */
+export function isHotButtonContent(content: QuestionContent): content is HotButtonContent {
+  return 'correctAnswer' in content && 'acceptedAnswers' in content && Array.isArray((content as any).acceptedAnswers);
+}
+
 // ============================================
 // FORM SCHEMAS (für Admin UI)
 // ============================================
@@ -227,7 +250,7 @@ export function isCollectiveListContent(content: QuestionContent): content is Co
 export const CreateQuestionSchema = z.object({
   categoryId: z.string().min(1, 'Kategorie auswählen'),
   text: z.string().min(10, 'Frage muss mindestens 10 Zeichen haben'),
-  type: z.enum(['MULTIPLE_CHOICE', 'ESTIMATION', 'TRUE_FALSE', 'SORTING', 'TEXT_INPUT', 'MATCHING', 'COLLECTIVE_LIST']),
+  type: z.enum(['MULTIPLE_CHOICE', 'ESTIMATION', 'TRUE_FALSE', 'SORTING', 'TEXT_INPUT', 'MATCHING', 'COLLECTIVE_LIST', 'HOT_BUTTON']),
   difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).default('MEDIUM'),
   content: z.unknown(), // Wird separat validiert basierend auf type
   mediaType: z.enum(['NONE', 'IMAGE', 'AUDIO', 'VIDEO']).default('NONE'),

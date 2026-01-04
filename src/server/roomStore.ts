@@ -244,47 +244,83 @@ export function roomToClient(room: GameRoom): Record<string, any> {
     round: room.state.diceRoyale.round,
   } : null;
 
-  // Convert BonusRound state for client (Set -> Array, hide aliases)
-  const bonusRoundClient = room.state.bonusRound ? {
-    phase: room.state.bonusRound.phase,
-    questionId: room.state.bonusRound.questionId, // For dev-mode editing
-    topic: room.state.bonusRound.topic,
-    description: room.state.bonusRound.description,
-    category: room.state.bonusRound.category,
-    categoryIcon: room.state.bonusRound.categoryIcon,
-    questionType: room.state.bonusRound.questionType,
-    totalItems: room.state.bonusRound.items.length,
-    items: room.state.bonusRound.items.map(item => ({
-      id: item.id,
-      display: item.display,
-      group: item.group,
-      guessedBy: item.guessedBy,
-      guessedByName: item.guessedByName,
-      guessedAt: item.guessedAt,
-      // Only send aliases for already guessed items (for duplicate detection on client)
-      aliases: item.guessedBy ? item.aliases : undefined,
-    })),
-    revealedCount: room.state.bonusRound.guessedIds.size,
-    currentTurn: room.state.bonusRound.activePlayers.length > 0 && room.state.bonusRound.phase === 'playing' ? (() => {
-      const bonusRound = room.state.bonusRound!;
-      const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
-      const player = room.players.get(currentPlayerId);
-      return player ? {
-        playerId: currentPlayerId,
-        playerName: player.name,
-        avatarSeed: player.avatarSeed,
-        turnNumber: bonusRound.turnNumber,
-        timerEnd: room.state.timerEnd || 0,
-      } : null;
-    })() : null,
-    turnOrder: room.state.bonusRound.turnOrder,
-    activePlayers: room.state.bonusRound.activePlayers,
-    eliminatedPlayers: room.state.bonusRound.eliminatedPlayers,
-    lastGuess: room.state.bonusRound.lastGuess,
-    pointsPerCorrect: room.state.bonusRound.pointsPerCorrect,
-    timePerTurn: room.state.bonusRound.timePerTurn,
-    fuzzyThreshold: room.state.bonusRound.fuzzyThreshold,
-  } : null;
+  // Convert BonusRound state for client
+  let bonusRoundClient = null;
+  
+  if (room.state.bonusRound) {
+    const br = room.state.bonusRound;
+    
+    if (br.type === 'collective_list') {
+      bonusRoundClient = {
+        type: 'collective_list',
+        phase: br.phase,
+        questionId: br.questionId,
+        topic: br.topic,
+        description: br.description,
+        category: br.category,
+        categoryIcon: br.categoryIcon,
+        questionType: br.questionType,
+        totalItems: br.items.length,
+        items: br.items.map(item => ({
+          id: item.id,
+          display: item.display,
+          group: item.group,
+          guessedBy: item.guessedBy,
+          guessedByName: item.guessedByName,
+          guessedAt: item.guessedAt,
+          // Only send aliases for already guessed items
+          aliases: item.guessedBy ? item.aliases : undefined,
+        })),
+        revealedCount: br.guessedIds.size,
+        currentTurn: br.activePlayers.length > 0 && br.phase === 'playing' ? (() => {
+          const currentPlayerId = br.activePlayers[br.currentTurnIndex % br.activePlayers.length];
+          const player = room.players.get(currentPlayerId);
+          return player ? {
+            playerId: currentPlayerId,
+            playerName: player.name,
+            avatarSeed: player.avatarSeed,
+            turnNumber: br.turnNumber,
+            timerEnd: room.state.timerEnd || 0,
+          } : null;
+        })() : null,
+        turnOrder: br.turnOrder,
+        activePlayers: br.activePlayers,
+        eliminatedPlayers: br.eliminatedPlayers,
+        lastGuess: br.lastGuess,
+        pointsPerCorrect: br.pointsPerCorrect,
+        timePerTurn: br.timePerTurn,
+        fuzzyThreshold: br.fuzzyThreshold,
+      };
+    } else if (br.type === 'hot_button') {
+      const currentQuestion = br.questions[br.currentQuestionIndex];
+      bonusRoundClient = {
+        type: 'hot_button',
+        phase: br.phase,
+        questionId: br.questionId,
+        topic: br.topic,
+        description: br.description,
+        category: br.category,
+        categoryIcon: br.categoryIcon,
+        
+        currentQuestionIndex: br.currentQuestionIndex,
+        totalQuestions: br.questions.length,
+        currentQuestionText: currentQuestion ? currentQuestion.text.substring(0, br.revealedChars) : '',
+        isFullyRevealed: br.isFullyRevealed,
+        
+        buzzedPlayerId: br.buzzedPlayerId,
+        buzzedPlayerName: br.buzzedPlayerId ? room.players.get(br.buzzedPlayerId)?.name : undefined,
+        buzzerTimerEnd: br.phase === 'question_reveal' ? room.state.timerEnd : null,
+        
+        answerTimerEnd: br.phase === 'answering' ? room.state.timerEnd : null,
+        lastAnswer: br.lastAnswer,
+        
+        attemptedPlayerIds: Array.from(br.attemptedPlayerIds),
+        remainingAttempts: br.maxRebuzzAttempts - br.attemptedPlayerIds.size,
+        
+        playerScores: Object.fromEntries(br.playerScores),
+      };
+    }
+  }
 
   return {
     code: room.code,
@@ -296,6 +332,7 @@ export function roomToClient(room: GameRoom): Record<string, any> {
     totalQuestions: room.settings.questionsPerRound,
     currentQuestion: clientQuestion,
     categorySelectionMode: room.state.categorySelectionMode,
+    selectedBonusType: room.state.selectedBonusType, // Für Bonusrunden-Roulette
     votingCategories: room.state.votingCategories,
     categoryVotes: Object.fromEntries(room.state.categoryVotes),
     selectedCategory: room.state.selectedCategory,

@@ -20,7 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { GameAvatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import type { BonusRoundState } from '@/types/game';
+import type { CollectiveListBonusRound } from '@/types/game';
 
 /**
  * CollectiveListGame - "Sammelliste" Bonusrunden-Spieltyp
@@ -50,7 +50,7 @@ export function CollectiveListGame() {
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const bonusRound = room?.bonusRound as BonusRoundState | null;
+  const bonusRound = room?.bonusRound as CollectiveListBonusRound | null;
   const isMyTurn = bonusRound?.currentTurn?.playerId === playerId;
   const isIntro = bonusRound?.phase === 'intro';
   const isPlaying = bonusRound?.phase === 'playing';

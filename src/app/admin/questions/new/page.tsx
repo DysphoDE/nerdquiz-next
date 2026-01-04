@@ -22,7 +22,7 @@ interface Category {
   icon: string;
 }
 
-type QuestionType = 'MULTIPLE_CHOICE' | 'ESTIMATION' | 'TRUE_FALSE' | 'SORTING' | 'TEXT_INPUT' | 'MATCHING' | 'COLLECTIVE_LIST';
+type QuestionType = 'MULTIPLE_CHOICE' | 'ESTIMATION' | 'TRUE_FALSE' | 'SORTING' | 'TEXT_INPUT' | 'MATCHING' | 'COLLECTIVE_LIST' | 'HOT_BUTTON';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 export default function NewQuestionPage() {
@@ -53,6 +53,11 @@ export default function NewQuestionPage() {
   const [collectiveDescription, setCollectiveDescription] = useState('');
   const [collectiveItemsText, setCollectiveItemsText] = useState('');
   const [collectiveTimePerTurn, setCollectiveTimePerTurn] = useState(15);
+  
+  // Hot Button state
+  const [hotButtonCorrectAnswer, setHotButtonCorrectAnswer] = useState('');
+  const [hotButtonAliases, setHotButtonAliases] = useState('');
+  const [hotButtonRevealSpeed, setHotButtonRevealSpeed] = useState(50);
 
   // Parse items text to structured format
   const parseCollectiveItems = (text: string) => {
@@ -113,6 +118,17 @@ export default function NewQuestionPage() {
           items: parsedItems,
           timePerTurn: collectiveTimePerTurn,
           fuzzyThreshold: 0.85,
+        };
+      } else if (type === 'HOT_BUTTON') {
+        const aliases = hotButtonAliases
+          .split(',')
+          .map(a => a.trim())
+          .filter(a => a.length > 0);
+        
+        content = {
+          correctAnswer: hotButtonCorrectAnswer,
+          acceptedAnswers: [hotButtonCorrectAnswer, ...aliases],
+          revealSpeed: hotButtonRevealSpeed,
         };
       }
 
@@ -220,6 +236,7 @@ export default function NewQuestionPage() {
                 <option value="ESTIMATION">Schätzfrage</option>
                 <option value="TRUE_FALSE">Wahr/Falsch</option>
                 <option value="COLLECTIVE_LIST">📋 Sammel-Liste</option>
+                <option value="HOT_BUTTON">⚡ Hot Button</option>
               </select>
             </div>
           </div>
@@ -278,6 +295,7 @@ export default function NewQuestionPage() {
             {type === 'ESTIMATION' && 'Schätzwert'}
             {type === 'TRUE_FALSE' && 'Richtige Antwort'}
             {type === 'COLLECTIVE_LIST' && 'Listen-Konfiguration'}
+            {type === 'HOT_BUTTON' && '⚡ Hot Button Konfiguration'}
           </h2>
 
           {/* Multiple Choice */}
@@ -460,6 +478,70 @@ New York, Newyork
 Texas
 Delaware`}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Hot Button */}
+          {type === 'HOT_BUTTON' && (
+            <div className="space-y-4">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
+                <p className="text-sm text-amber-200 flex items-start gap-2">
+                  <span className="text-xl shrink-0">⚡</span>
+                  <span>
+                    <strong>Hot Button:</strong> Einzelfrage für Buzzer-Runden. Die Frage wird Zeichen für Zeichen enthüllt.
+                    Spieler buzzern und antworten. Richtige Antwort: Punkte + Speed-Bonus. Falsche Antwort: -500 Punkte.
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Richtige Antwort *
+                </label>
+                <Input
+                  value={hotButtonCorrectAnswer}
+                  onChange={(e) => setHotButtonCorrectAnswer(e.target.value)}
+                  placeholder="z.B. Leonardo DiCaprio"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Akzeptierte Varianten (optional)
+                </label>
+                <Input
+                  value={hotButtonAliases}
+                  onChange={(e) => setHotButtonAliases(e.target.value)}
+                  placeholder="z.B. DiCaprio, Leo DiCaprio (mit Kommas trennen)"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Alternative Schreibweisen die auch als richtig gelten. Fuzzy Matching erkennt auch Tippfehler!
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Enthüllungs-Geschwindigkeit
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min={20}
+                    max={100}
+                    step={10}
+                    value={hotButtonRevealSpeed}
+                    onChange={(e) => setHotButtonRevealSpeed(parseInt(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-mono bg-muted px-3 py-1 rounded">
+                    {hotButtonRevealSpeed}ms
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Millisekunden pro Zeichen. Niedriger = schneller (20-30ms: schwer, 50ms: mittel, 80-100ms: einfach)
+                </p>
               </div>
             </div>
           )}

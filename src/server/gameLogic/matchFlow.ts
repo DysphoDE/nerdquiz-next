@@ -33,8 +33,68 @@ import {
   startRPSDuel,
 } from './categorySelection';
 import { startBonusRound } from './bonusRound';
+import { IMPLEMENTED_BONUS_TYPES_DATA } from '@/config/gameModes.shared';
 
 const dev = process.env.NODE_ENV !== 'production';
+
+// ============================================
+// BONUS QUESTION LOADERS (Strategy Pattern)
+// ============================================
+
+/**
+ * Mapping von Bonus-Typ zu Loader-Funktion
+ * Macht es einfach, neue Bonus-Typen hinzuzufügen ohne if-else Ketten
+ */
+type QuestionLoaderFn = (excludeIds: string[], count?: number) => Promise<any | null>;
+
+const BONUS_QUESTION_LOADERS: Record<string, QuestionLoaderFn> = {
+  'hot_button': (excludeIds, count = 5) => questionLoader.getRandomHotButtonQuestions(excludeIds, count),
+  'collective_list': (excludeIds) => questionLoader.getRandomBonusRoundQuestion(excludeIds),
+  // Zukünftige Typen hier einfach hinzufügen:
+  // 'sorting': (excludeIds) => questionLoader.getRandomSortingQuestions(excludeIds),
+  // 'matching': (excludeIds) => questionLoader.getRandomMatchingQuestions(excludeIds),
+};
+
+// ============================================
+// BONUS ROUND TYPE SELECTION
+// ============================================
+
+/**
+ * Wählt intelligent den nächsten Bonus-Typ aus
+ * - Priorität für noch nicht gespielte Typen
+ * - Reset wenn alle Typen gespielt wurden
+ * - Funktioniert mit beliebig vielen Bonus-Typen
+ */
+function selectBonusType(room: GameRoom): string {
+  const availableTypes = IMPLEMENTED_BONUS_TYPES_DATA.map(t => t.id);
+  
+  if (availableTypes.length === 0) {
+    return 'collective_list'; // Fallback
+  }
+  
+  if (availableTypes.length === 1) {
+    return availableTypes[0]; // Nur ein Typ verfügbar
+  }
+  
+  // Auto-Reset wenn alle Typen gespielt wurden
+  if (room.state.usedBonusTypes.size >= availableTypes.length) {
+    console.log(`♻️ All ${availableTypes.length} bonus types played, resetting pool for variety`);
+    room.state.usedBonusTypes.clear();
+  }
+  
+  // Filter: Noch nicht gespielte Typen
+  const unusedTypes = availableTypes.filter(type => !room.state.usedBonusTypes.has(type));
+  
+  // Wenn noch ungespielte Typen existieren, wähle daraus
+  if (unusedTypes.length > 0) {
+    const randomIndex = Math.floor(Math.random() * unusedTypes.length);
+    return unusedTypes[randomIndex];
+  }
+  
+  // Fallback (sollte nie passieren nach Reset)
+  const randomIndex = Math.floor(Math.random() * availableTypes.length);
+  return availableTypes[randomIndex];
+}
 
 // ============================================
 // START CATEGORY SELECTION (Main Entry Point)
@@ -70,19 +130,58 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
   if (shouldBeBonusRound) {
     console.log(`🎯 Round ${room.state.currentRound}: BONUS ROUND triggered!`);
     
-    // Load bonus round question from DB
+    // Smart selection: Choose bonus type that hasn't been played yet
+    const selectedBonusType = selectBonusType(room);
+    console.log(`🎰 Selected bonus type: ${selectedBonusType} (used: [${Array.from(room.state.usedBonusTypes).join(', ')}])`);
+    
+    // Load appropriate bonus round question from DB
     const excludeIds = Array.from(room.state.usedBonusQuestionIds);
-    const bonusQuestion = await questionLoader.getRandomBonusRoundQuestion(excludeIds);
+    const hotButtonCount = room.settings.hotButtonQuestionsPerRound || 5;
+    
+    // Use strategy pattern for loading questions
+    const loader = BONUS_QUESTION_LOADERS[selectedBonusType];
+    let bonusQuestion = loader ? await loader(excludeIds, hotButtonCount) : null;
+    
+    // Fallback: If selected type not available, try other types
+    if (!bonusQuestion) {
+      console.log(`⚠️ No ${selectedBonusType} questions available, trying fallback...`);
+      const otherTypes = IMPLEMENTED_BONUS_TYPES_DATA.filter(t => t.id !== selectedBonusType);
+      
+      for (const type of otherTypes) {
+        const fallbackLoader = BONUS_QUESTION_LOADERS[type.id];
+        if (fallbackLoader) {
+          bonusQuestion = await fallbackLoader(excludeIds, hotButtonCount);
+          if (bonusQuestion) {
+            console.log(`✅ Fallback successful: Using ${type.id}`);
+            break;
+          }
+        }
+      }
+    }
     
     if (bonusQuestion) {
-      room.state.usedBonusQuestionIds.add(bonusQuestion.id);
+      // Add all used question IDs to the set
+      if (bonusQuestion.questionIds) {
+        bonusQuestion.questionIds.forEach((id: string) => room.state.usedBonusQuestionIds.add(id));
+      } else if (bonusQuestion.id) {
+        room.state.usedBonusQuestionIds.add(bonusQuestion.id);
+      }
+      
+      // Determine bonus type from questionType
+      const bonusType = bonusQuestion.questionType === 'HOT_BUTTON' ? 'hot_button' : 'collective_list';
+      
+      // Mark this type as used for variety tracking
+      room.state.usedBonusTypes.add(bonusType);
+      console.log(`✅ Bonus type '${bonusType}' marked as used. Total used: ${room.state.usedBonusTypes.size}`);
       
       // Show bonus round announcement with roulette
       room.state.phase = 'bonus_round_announcement';
       room.state.categorySelectionMode = null;
+      room.state.selectedBonusType = bonusType; // Set for roulette display
       
       // Store pending question
       room.pendingBonusQuestion = {
+        type: bonusQuestion.type || 'collective_list',
         id: bonusQuestion.id,
         topic: bonusQuestion.topic,
         description: bonusQuestion.description,
@@ -93,6 +192,12 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
         timePerTurn: bonusQuestion.timePerTurn,
         pointsPerCorrect: bonusQuestion.pointsPerCorrect,
         fuzzyThreshold: bonusQuestion.fuzzyThreshold,
+        // Hot Button specific fields
+        questions: bonusQuestion.questions,
+        buzzerTimeout: bonusQuestion.buzzerTimeout,
+        answerTimeout: bonusQuestion.answerTimeout,
+        allowRebuzz: bonusQuestion.allowRebuzz,
+        maxRebuzzAttempts: bonusQuestion.maxRebuzzAttempts,
       };
       
       emitPhaseChange(room, io, 'bonus_round_announcement');

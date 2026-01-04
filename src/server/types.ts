@@ -110,7 +110,7 @@ export interface RPSDuelState {
 }
 
 // ============================================
-// BONUS ROUND STATE
+// BONUS ROUND STATE - COLLECTIVE LIST
 // ============================================
 
 export interface BonusRoundItem {
@@ -123,7 +123,8 @@ export interface BonusRoundItem {
   guessedAt?: number;
 }
 
-export interface ServerBonusRoundState {
+export interface ServerCollectiveListState {
+  type: 'collective_list';
   phase: 'intro' | 'playing' | 'finished';
   questionId?: string; // DB question ID for dev-mode editing
   topic: string;
@@ -158,6 +159,71 @@ export interface ServerBonusRoundState {
   turnNumber: number;
   playerCorrectCounts: Map<string, number>;
 }
+
+// ============================================
+// BONUS ROUND STATE - HOT BUTTON
+// ============================================
+
+export interface HotButtonQuestion {
+  id: string;
+  text: string;
+  correctAnswer: string;
+  acceptedAnswers: string[];
+  revealSpeed?: number;
+  pointsCorrect: number;
+  pointsWrong: number;
+}
+
+export interface ServerHotButtonState {
+  type: 'hot_button';
+  phase: 'intro' | 'question_reveal' | 'buzzer_active' | 'answering' | 'result' | 'finished';
+  questionId?: string; // DB ID
+  topic: string;
+  description?: string;
+  category?: string;
+  categoryIcon?: string;
+  
+  // Questions
+  questions: HotButtonQuestion[];
+  currentQuestionIndex: number;
+  
+  // Reveal state
+  revealedChars: number;
+  revealTimer: NodeJS.Timeout | null;
+  isFullyRevealed: boolean;
+  
+  // Buzzer state
+  buzzedPlayerId: string | null;
+  buzzerTimeout: NodeJS.Timeout | null;
+  buzzerTimeoutDuration: number;
+  buzzOrder: string[];
+  buzzTimestamps: Map<string, number>; // playerId -> timestamp when they buzzed
+  
+  // Answer state
+  answerTimer: NodeJS.Timeout | null;
+  answerTimeoutDuration: number;
+  lastAnswer?: {
+    playerId: string;
+    playerName: string;
+    input: string;
+    correct: boolean;
+    confidence?: number;
+  };
+  
+  // Attempt tracking
+  attemptedPlayerIds: Set<string>;
+  maxRebuzzAttempts: number;
+  allowRebuzz: boolean;
+  
+  // Scoring
+  playerScores: Map<string, number>;
+  
+  // Settings
+  fuzzyThreshold: number;
+}
+
+// Union type for all bonus round states
+export type ServerBonusRoundState = ServerCollectiveListState | ServerHotButtonState;
 
 // ============================================
 // GAME PHASE
@@ -195,6 +261,7 @@ export interface GameSettings {
   finalRoundAlwaysBonus: boolean;
   enableEstimation: boolean;
   enableMediaQuestions: boolean;
+  hotButtonQuestionsPerRound: number; // Anzahl Fragen pro Hot Button Runde (default: 5)
 }
 
 // ============================================
@@ -207,6 +274,8 @@ export interface GameState {
   currentQuestionIndex: number;
   currentQuestion: GameQuestion | null;
   categorySelectionMode: CategorySelectionMode | null;
+  selectedBonusType: string | null; // 'collective_list' | 'hot_button' für Roulette-Anzeige
+  usedBonusTypes: Set<string>; // Track which bonus types have been played (for variety)
   votingCategories: CategoryInfo[];
   categoryVotes: Map<string, string>;
   selectedCategory: string | null;
@@ -259,15 +328,27 @@ export interface GameRoom {
 
 export interface BonusRoundConfig {
   id?: string;
-  topic: string;
+  type?: string; // 'collective_list' | 'hot_button'
+  topic?: string;
   description?: string;
   category?: string;
   categoryIcon?: string;
   questionType?: string;
-  items: Array<{ id: string; display: string; aliases: string[]; group?: string }>;
+  questionIds?: string[]; // For tracking used questions
+  
+  // For Collective List
+  items?: Array<{ id: string; display: string; aliases: string[]; group?: string }>;
   timePerTurn?: number;
-  fuzzyThreshold?: number;
   pointsPerCorrect?: number;
+  fuzzyThreshold?: number;
+  
+  // For Hot Button
+  questions?: HotButtonQuestion[];
+  hotButtonQuestions?: HotButtonQuestion[]; // Legacy support
+  buzzerTimeout?: number;
+  answerTimeout?: number;
+  allowRebuzz?: boolean;
+  maxRebuzzAttempts?: number;
 }
 
 // ============================================
@@ -372,6 +453,7 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   finalRoundAlwaysBonus: true, // Standard: Letzte Runde ist immer Bonusrunde
   enableEstimation: true,
   enableMediaQuestions: false,
+  hotButtonQuestionsPerRound: 5, // Standard: 5 Fragen pro Hot Button Runde
 };
 
 // ============================================
@@ -385,6 +467,8 @@ export function createInitialGameState(): GameState {
     currentQuestionIndex: 0,
     currentQuestion: null,
     categorySelectionMode: null,
+    selectedBonusType: null,
+    usedBonusTypes: new Set(),
     votingCategories: [],
     categoryVotes: new Map(),
     selectedCategory: null,

@@ -592,6 +592,161 @@ class BotManager {
       console.warn(`🤖 No handler for action: ${action}`);
     }
   }
+  
+  /**
+   * Called when a new Hot Button question starts (all players can buzz)
+   */
+  onHotButtonQuestionStart(roomCode: string) {
+    const botsInRoom = this.getBotsInRoom(roomCode);
+    if (botsInRoom.length === 0) return;
+
+    const room = this.getRoomFn?.(roomCode);
+    if (!room || room.state.phase !== 'bonus_round') return;
+    
+    const bonusRound = room.state.bonusRound;
+    if (!bonusRound || bonusRound.type !== 'hot_button') return;
+
+    // Each bot decides independently when to buzz
+    botsInRoom.forEach(bot => {
+      // Skip if bot has already attempted this question
+      if (bonusRound.attemptedPlayerIds.has(bot.id)) return;
+      
+      // Bot decides: 60% chance to try buzzing, 40% wait/skip
+      const shouldBuzz = Math.random() < 0.6;
+      if (!shouldBuzz) return;
+      
+      // Random delay (1-8 seconds) - some bots are faster than others
+      const buzzDelay = this.randomDelay(1000, 8000);
+      const timerId = `${bot.id}-hotbutton-buzz`;
+      
+      const timer = setTimeout(() => {
+        this.activeTimers.delete(timerId);
+        
+        // Re-validate state before buzzing
+        const currentRoom = this.getRoomFn?.(roomCode);
+        if (!currentRoom || currentRoom.state.phase !== 'bonus_round') return;
+        if (!currentRoom.state.bonusRound || currentRoom.state.bonusRound.type !== 'hot_button') return;
+        if (currentRoom.state.bonusRound.phase !== 'question_reveal') return;
+        if (currentRoom.state.bonusRound.attemptedPlayerIds.has(bot.id)) return;
+        
+        console.log(`🤖 ${bot.name} buzzing!`);
+        this.triggerAction('hot_button_buzz', {
+          roomCode: bot.roomCode,
+          playerId: bot.id,
+        });
+        
+        // After buzzing, bot needs to answer
+        const answerDelay = this.randomDelay(2000, 5000);
+        const answerTimerId = `${bot.id}-hotbutton-answer`;
+        
+        const answerTimer = setTimeout(() => {
+          this.activeTimers.delete(answerTimerId);
+          
+          // Re-validate state before answering
+          const answerRoom = this.getRoomFn?.(roomCode);
+          if (!answerRoom || answerRoom.state.phase !== 'bonus_round') return;
+          if (!answerRoom.state.bonusRound || answerRoom.state.bonusRound.type !== 'hot_button') return;
+          if (answerRoom.state.bonusRound.phase !== 'answering') return;
+          if (answerRoom.state.bonusRound.buzzedPlayerId !== bot.id) return;
+          
+          const currentQuestion = answerRoom.state.bonusRound.questions[answerRoom.state.bonusRound.currentQuestionIndex];
+          
+          // Bot has 70% chance to answer correctly
+          const answerCorrectly = Math.random() < 0.7;
+          const answer = answerCorrectly 
+            ? currentQuestion.correctAnswer 
+            : `Wrong answer ${Math.random().toString(36).substring(7)}`;
+          
+          console.log(`🤖 ${bot.name} answering: "${answer}" (${answerCorrectly ? 'correct' : 'wrong'})`);
+          this.triggerAction('hot_button_submit', {
+            roomCode: bot.roomCode,
+            playerId: bot.id,
+            answer,
+          });
+        }, answerDelay);
+        
+        this.activeTimers.set(answerTimerId, answerTimer);
+      }, buzzDelay);
+      
+      this.activeTimers.set(timerId, timer);
+    });
+  }
+
+  /**
+   * Called when a Hot Button question allows rebuzzing (after wrong answer)
+   */
+  onHotButtonRebuzz(roomCode: string) {
+    const botsInRoom = this.getBotsInRoom(roomCode);
+    if (botsInRoom.length === 0) return;
+
+    const room = this.getRoomFn?.(roomCode);
+    if (!room || room.state.phase !== 'bonus_round') return;
+    
+    const bonusRound = room.state.bonusRound;
+    if (!bonusRound || bonusRound.type !== 'hot_button') return;
+
+    botsInRoom.forEach(bot => {
+      // Skip if bot has already attempted this question
+      if (bonusRound.attemptedPlayerIds.has(bot.id)) return;
+      
+      // Bot is more cautious after seeing a wrong answer: 50% chance
+      const shouldBuzz = Math.random() < 0.5;
+      if (!shouldBuzz) return;
+      
+      // Slightly longer delay on rebuzz (thinking time)
+      const buzzDelay = this.randomDelay(2000, 10000);
+      const timerId = `${bot.id}-hotbutton-rebuzz`;
+      
+      const timer = setTimeout(() => {
+        this.activeTimers.delete(timerId);
+        
+        const currentRoom = this.getRoomFn?.(roomCode);
+        if (!currentRoom || currentRoom.state.phase !== 'bonus_round') return;
+        if (!currentRoom.state.bonusRound || currentRoom.state.bonusRound.type !== 'hot_button') return;
+        if (currentRoom.state.bonusRound.phase !== 'question_reveal') return;
+        if (currentRoom.state.bonusRound.attemptedPlayerIds.has(bot.id)) return;
+        
+        console.log(`🤖 ${bot.name} rebuzzing!`);
+        this.triggerAction('hot_button_buzz', {
+          roomCode: bot.roomCode,
+          playerId: bot.id,
+        });
+        
+        // Answer handling
+        const answerDelay = this.randomDelay(2000, 5000);
+        const answerTimerId = `${bot.id}-hotbutton-rebuzz-answer`;
+        
+        const answerTimer = setTimeout(() => {
+          this.activeTimers.delete(answerTimerId);
+          
+          const answerRoom = this.getRoomFn?.(roomCode);
+          if (!answerRoom || answerRoom.state.phase !== 'bonus_round') return;
+          if (!answerRoom.state.bonusRound || answerRoom.state.bonusRound.type !== 'hot_button') return;
+          if (answerRoom.state.bonusRound.phase !== 'answering') return;
+          if (answerRoom.state.bonusRound.buzzedPlayerId !== bot.id) return;
+          
+          const currentQuestion = answerRoom.state.bonusRound.questions[answerRoom.state.bonusRound.currentQuestionIndex];
+          
+          // Bot has 75% chance to answer correctly on rebuzz
+          const answerCorrectly = Math.random() < 0.75;
+          const answer = answerCorrectly 
+            ? currentQuestion.correctAnswer 
+            : `Wrong answer ${Math.random().toString(36).substring(7)}`;
+          
+          console.log(`🤖 ${bot.name} rebuzz answer: "${answer}" (${answerCorrectly ? 'correct' : 'wrong'})`);
+          this.triggerAction('hot_button_submit', {
+            roomCode: bot.roomCode,
+            playerId: bot.id,
+            answer,
+          });
+        }, answerDelay);
+        
+        this.activeTimers.set(answerTimerId, answerTimer);
+      }, buzzDelay);
+      
+      this.activeTimers.set(timerId, timer);
+    });
+  }
 
   /**
    * Generate random delay between min and max ms

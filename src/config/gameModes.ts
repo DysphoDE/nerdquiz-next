@@ -12,6 +12,7 @@ import {
   Dices, 
   Swords,
   ListChecks,
+  Zap,
   ArrowUpDown,
   Type,
   Link2,
@@ -42,6 +43,7 @@ const CATEGORY_MODE_ICONS: Record<string, LucideIcon> = {
 
 const BONUS_TYPE_ICONS: Record<string, LucideIcon> = {
   collective_list: ListChecks,
+  hot_button: Zap,
   sorting: ArrowUpDown,
   text_input: Type,
   matching: Link2,

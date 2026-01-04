@@ -601,6 +601,129 @@ export async function getRandomBonusRoundQuestion(excludeIds: string[] = []): Pr
 }
 
 /**
+ * Get random HOT_BUTTON questions from the database (5 questions for a round)
+ * @param excludeIds - Question IDs to exclude (already used in this session)
+ * @param count - Number of questions to fetch (default: 5)
+ */
+export async function getRandomHotButtonQuestions(excludeIds: string[] = [], count: number = 5): Promise<any | null> {
+  if (!prisma) {
+    console.warn('⚠️ Database not available for hot button questions');
+    return null;
+  }
+
+  try {
+    // Get count of available questions first
+    const availableCount = await prisma.question.count({
+      where: {
+        type: 'HOT_BUTTON',
+        isActive: true,
+        ...(excludeIds.length > 0 && { id: { notIn: excludeIds } }),
+      },
+    });
+
+    // If not enough questions available with exclusions, try without
+    let finalExcludeIds = excludeIds;
+    let questionCount = availableCount;
+    
+    if (availableCount < count && excludeIds.length > 0) {
+      console.log('♻️ Not enough hot button questions, resetting pool');
+      questionCount = await prisma.question.count({
+        where: {
+          type: 'HOT_BUTTON',
+          isActive: true,
+        },
+      });
+      finalExcludeIds = [];
+    }
+
+    if (questionCount === 0) {
+      console.warn('⚠️ No HOT_BUTTON questions found in database');
+      return null;
+    }
+
+    // Fetch random questions
+    const questionsToFetch = Math.min(count, questionCount);
+    const randomOffsets = [];
+    
+    // Generate random unique offsets
+    for (let i = 0; i < questionsToFetch; i++) {
+      let offset;
+      do {
+        offset = Math.floor(Math.random() * questionCount);
+      } while (randomOffsets.includes(offset));
+      randomOffsets.push(offset);
+    }
+
+    // Fetch all questions in parallel
+    const questionPromises = randomOffsets.map(offset =>
+      prisma!.question.findMany({
+        where: {
+          type: 'HOT_BUTTON',
+          isActive: true,
+          ...(finalExcludeIds.length > 0 && { id: { notIn: finalExcludeIds } }),
+        },
+        skip: offset,
+        take: 1,
+        include: {
+          category: true,
+        },
+      })
+    );
+
+    const questionResults = await Promise.all(questionPromises);
+    const questions = questionResults.flat().filter(q => q); // Flatten and remove nulls
+
+    if (questions.length === 0) {
+      console.warn('⚠️ Failed to fetch hot button questions');
+      return null;
+    }
+
+    // Transform questions
+    const hotButtonQuestions = questions.map((q, idx) => {
+      const content = q.content as any;
+
+      if (!content?.correctAnswer) {
+        console.warn(`⚠️ Invalid HOT_BUTTON content structure for question ${q.id}`);
+        return null;
+      }
+
+      return {
+        id: q.id,
+        text: q.text,
+        correctAnswer: content.correctAnswer,
+        acceptedAnswers: content.acceptedAnswers || [content.correctAnswer],
+        revealSpeed: content.revealSpeed || 50,
+        pointsCorrect: 1500, // Base points
+        pointsWrong: -500,
+        category: q.category?.name,
+        categoryIcon: q.category?.icon,
+        difficulty: q.difficulty,
+      };
+    }).filter(q => q !== null);
+
+    if (hotButtonQuestions.length === 0) {
+      return null;
+    }
+
+    // Return a package with all questions
+    return {
+      type: 'hot_button',
+      questionType: 'HOT_BUTTON', // WICHTIG für bonusRound.ts Router
+      questionIds: hotButtonQuestions.map(q => q.id),
+      questions: hotButtonQuestions,
+      buzzerTimeout: 30,
+      answerTimeout: 15,
+      allowRebuzz: true,
+      maxRebuzzAttempts: 2,
+      fuzzyThreshold: 0.85,
+    };
+  } catch (error) {
+    console.error('Error loading hot button questions:', error);
+    return null;
+  }
+}
+
+/**
  * Get category data by ID/slug
  */
 export async function getCategoryData(categoryId: string): Promise<{ name: string; icon: string } | null> {

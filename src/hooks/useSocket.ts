@@ -299,6 +299,20 @@ export function useSocket() {
     if (!roomCode || !playerId) return;
     socket.emit('bonus_round_skip', { roomCode, playerId });
   }, []);
+  
+  const buzzHotButton = useCallback(() => {
+    const socket = getSocket();
+    const { playerId, roomCode } = useGameStore.getState();
+    if (!roomCode || !playerId) return;
+    socket.emit('hot_button_buzz', { roomCode, playerId });
+  }, []);
+
+  const submitHotButtonAnswer = useCallback((answer: string) => {
+    const socket = getSocket();
+    const { playerId, roomCode } = useGameStore.getState();
+    if (!roomCode || !playerId) return;
+    socket.emit('hot_button_submit', { roomCode, playerId, answer });
+  }, []);
 
   const voteRematch = useCallback((vote: 'yes' | 'no') => {
     const socket = getSocket();
@@ -323,6 +337,8 @@ export function useSocket() {
     updateAvatar,
     submitBonusRoundAnswer,
     skipBonusRound,
+    buzzHotButton,
+    submitHotButtonAnswer,
     voteRematch,
   };
 }
