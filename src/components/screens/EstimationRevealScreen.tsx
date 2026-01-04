@@ -11,32 +11,98 @@ import { cn } from '@/lib/utils';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 
 // Lustige Sprüche basierend auf Abweichung (Prozent vom korrekten Wert)
+// Mehrere Varianten pro Kategorie für Abwechslung
+const QUIP_VARIANTS = {
+  perfect: [
+    { text: 'PERFEKT! Hast du gegoogelt?! 🤯', emoji: '🎯' },
+    { text: 'WOW! Exakt richtig! 🎯', emoji: '🎯' },
+    { text: 'Unglaublich! Punktlandung! 💯', emoji: '🎯' },
+    { text: 'Hellseher oder was?! 🔮', emoji: '🎯' },
+    { text: 'Das war EXAKT! Respekt! 👑', emoji: '🎯' },
+  ],
+  excellent: [ // <= 5%
+    { text: 'Krass nah dran!', emoji: '🔥' },
+    { text: 'Fast perfekt! 🔥', emoji: '🔥' },
+    { text: 'Mega gut geschätzt!', emoji: '🔥' },
+    { text: 'So nah, das zählt fast!', emoji: '🔥' },
+    { text: 'Hammer-Schätzung!', emoji: '🔥' },
+  ],
+  veryGood: [ // <= 10%
+    { text: 'Sehr gut geschätzt!', emoji: '👏' },
+    { text: 'Starke Leistung!', emoji: '👏' },
+    { text: 'Top Schätzung!', emoji: '👏' },
+    { text: 'Richtig gutes Gefühl!', emoji: '👏' },
+    { text: 'Fast wie ein Profi!', emoji: '👏' },
+  ],
+  good: [ // <= 20%
+    { text: 'Solide Schätzung!', emoji: '👍' },
+    { text: 'Geht klar!', emoji: '👍' },
+    { text: 'Nicht schlecht!', emoji: '👍' },
+    { text: 'Passt schon!', emoji: '👍' },
+    { text: 'Kann man gelten lassen!', emoji: '👍' },
+  ],
+  okay: [ // <= 35%
+    { text: 'Naja, geht so...', emoji: '😅' },
+    { text: 'Mittelmäßig...', emoji: '😅' },
+    { text: 'Da geht noch was!', emoji: '😅' },
+    { text: 'Könnte besser sein...', emoji: '😅' },
+    { text: 'Hm, naja...', emoji: '😅' },
+  ],
+  bad: [ // <= 50%
+    { text: 'Bisschen daneben...', emoji: '🤔' },
+    { text: 'Das war eher geraten, oder?', emoji: '🤔' },
+    { text: 'Uff, nicht so gut...', emoji: '🤔' },
+    { text: 'Schätzung mit Augenbinde?', emoji: '🤔' },
+    { text: 'Nächstes Mal besser!', emoji: '🤔' },
+  ],
+  veryBad: [ // <= 100%
+    { text: 'Das war nix, Digga!', emoji: '💀' },
+    { text: 'Komplett vorbei!', emoji: '💀' },
+    { text: 'Aua, das tat weh...', emoji: '💀' },
+    { text: 'Nicht mal in der Nähe!', emoji: '💀' },
+    { text: 'Brudi... einfach nein.', emoji: '💀' },
+  ],
+  terrible: [ // <= 200%
+    { text: 'Komplett verpeilt!', emoji: '🤡' },
+    { text: 'Alter, was?! 😂', emoji: '🤡' },
+    { text: 'Das kann nicht dein Ernst sein!', emoji: '🤡' },
+    { text: 'Im falschen Film?', emoji: '🤡' },
+    { text: 'Mathelehrer weint gerade...', emoji: '🤡' },
+  ],
+  catastrophic: [ // > 200%
+    { text: 'Alter... was war das?!', emoji: '☠️' },
+    { text: 'Auf die Tastatur gefallen? 😭', emoji: '☠️' },
+    { text: 'Das war legendär schlecht!', emoji: '☠️' },
+    { text: 'Willst du mich verarschen?', emoji: '☠️' },
+    { text: 'Du hast keinen Bock mehr, oder?', emoji: '☠️' },
+  ],
+};
+
 const getQuip = (diffPercent: number, isExact: boolean): { text: string; emoji: string } => {
+  let variants: { text: string; emoji: string }[];
+  
   if (isExact) {
-    return { text: 'PERFEKT! Hast du gegoogelt?! 🤯', emoji: '🎯' };
+    variants = QUIP_VARIANTS.perfect;
+  } else if (diffPercent <= 5) {
+    variants = QUIP_VARIANTS.excellent;
+  } else if (diffPercent <= 10) {
+    variants = QUIP_VARIANTS.veryGood;
+  } else if (diffPercent <= 20) {
+    variants = QUIP_VARIANTS.good;
+  } else if (diffPercent <= 35) {
+    variants = QUIP_VARIANTS.okay;
+  } else if (diffPercent <= 50) {
+    variants = QUIP_VARIANTS.bad;
+  } else if (diffPercent <= 100) {
+    variants = QUIP_VARIANTS.veryBad;
+  } else if (diffPercent <= 200) {
+    variants = QUIP_VARIANTS.terrible;
+  } else {
+    variants = QUIP_VARIANTS.catastrophic;
   }
-  if (diffPercent <= 5) {
-    return { text: 'Krass nah dran!', emoji: '🔥' };
-  }
-  if (diffPercent <= 10) {
-    return { text: 'Sehr gut geschätzt!', emoji: '👏' };
-  }
-  if (diffPercent <= 20) {
-    return { text: 'Solide Schätzung!', emoji: '👍' };
-  }
-  if (diffPercent <= 35) {
-    return { text: 'Naja, geht so...', emoji: '😅' };
-  }
-  if (diffPercent <= 50) {
-    return { text: 'Bisschen daneben...', emoji: '🤔' };
-  }
-  if (diffPercent <= 100) {
-    return { text: 'Das war nix, Digga!', emoji: '💀' };
-  }
-  if (diffPercent <= 200) {
-    return { text: 'Komplett verpeilt!', emoji: '🤡' };
-  }
-  return { text: 'Alter... was war das?!', emoji: '☠️' };
+  
+  // Zufällige Auswahl aus der jeweiligen Kategorie
+  return variants[Math.floor(Math.random() * variants.length)];
 };
 
 // Animated counter component
