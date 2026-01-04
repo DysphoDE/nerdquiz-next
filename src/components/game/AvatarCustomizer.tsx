@@ -77,8 +77,10 @@ const HAIR_COLORS = [
   { name: 'Magenta', value: 'ff1493' },
   { name: 'Lila', value: '9370db' },
   { name: 'Violett', value: '8b00ff' },
+  { name: 'Dunkelblau', value: '00008b' },
   { name: 'Blau', value: '4169e1' },
   { name: 'Türkis', value: '40e0d0' },
+  { name: 'Dunkelgrün', value: '006400' },
   { name: 'Grün', value: '228b22' },
   { name: 'Lime', value: '32cd32' },
   { name: 'Grau', value: '808080' },
@@ -87,25 +89,34 @@ const HAIR_COLORS = [
 ];
 
 const BACKGROUND_COLORS = [
-  { name: 'Transparent', value: 'transparent' },
   { name: 'Weiß', value: 'ffffff' },
   { name: 'Hellgrau', value: 'f0f0f0' },
   { name: 'Grau', value: 'd3d3d3' },
+  { name: 'Dunkelgrau', value: 'a9a9a9' },
+  { name: 'Schwarz', value: '000000' },
   { name: 'Coral', value: 'ff7f7f' },
+  { name: 'Rot', value: 'ff0000' },
+  { name: 'Dunkelrot', value: '8b0000' },
   { name: 'Pfirsich', value: 'ffdab9' },
+  { name: 'Orange', value: 'ffa500' },
   { name: 'Gelb', value: 'ffd700' },
   { name: 'Hellgelb', value: 'fff500' },
   { name: 'Mint', value: '98fb98' },
   { name: 'Hellgrün', value: 'b6e3f4' },
+  { name: 'Grün', value: '008000' },
   { name: 'Türkis', value: '40e0d0' },
+  { name: 'Teal', value: '008080' },
   { name: 'Himmelblau', value: '87ceeb' },
   { name: 'Hellblau', value: 'add8e6' },
+  { name: 'Blau', value: '0000ff' },
+  { name: 'Navy', value: '000080' },
   { name: 'Lavendel', value: 'e6e6fa' },
   { name: 'Lila', value: 'c0aede' },
   { name: 'Violett', value: 'dda0dd' },
+  { name: 'Purple', value: '800080' },
   { name: 'Rosa', value: 'ffb6c1' },
   { name: 'Pink', value: 'ffd5dc' },
-  { name: 'Orange', value: 'ffdfbf' },
+  { name: 'Hot Pink', value: 'ff69b4' },
 ];
 
 const HAIR_LABELS: Record<string, string> = {
@@ -151,7 +162,7 @@ export const DEFAULT_AVATAR_OPTIONS: DylanAvatarOptions = {
   hair: 'wavy',
   hairColor: '3d2314',
   skinColor: 'e8c4a0',
-  backgroundColor: 'transparent',
+  backgroundColor: 'ffffff',
   facialHair: '',
 };
 
@@ -303,7 +314,7 @@ export function AvatarCustomizer({
   }, [options, onSave, onOpenChange]);
   
   const tabs: { id: TabType; label: string; icon: React.ElementType }[] = [
-    { id: 'hair', label: 'Haare', icon: User },
+    { id: 'hair', label: 'Stil', icon: User },
     { id: 'colors', label: 'Farben', icon: Palette },
   ];
   
@@ -420,6 +431,43 @@ export function AvatarCustomizer({
                 </div>
               </div>
               
+              {/* Facial Hair */}
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Gesichtsbehaarung
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {FACIAL_HAIR_OPTIONS.map((option) => (
+                    <motion.button
+                      key={option.value}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => updateOption('facialHair', option.value)}
+                      className={`relative p-2 rounded-xl text-center transition-all ${
+                        options.facialHair === option.value
+                          ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
+                          : 'bg-muted hover:bg-muted/80'
+                      }`}
+                    >
+                      <span className="text-xs font-medium">{option.label}</span>
+                      {options.facialHair === option.value && (
+                        <motion.div
+                          layoutId="facial-hair-check"
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center"
+                        >
+                          <Check className="w-2.5 h-2.5 text-white" />
+                        </motion.div>
+                      )}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          
+          {activeTab === 'colors' && (
+            <div className="space-y-4">
               {/* Hair Color */}
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -451,44 +499,7 @@ export function AvatarCustomizer({
                   ))}
                 </div>
               </div>
-              
-              {/* Facial Hair */}
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Gesichtsbehaarung
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {FACIAL_HAIR_OPTIONS.map((option) => (
-                    <motion.button
-                      key={option.value}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => updateOption('facialHair', option.value)}
-                      className={`relative p-3 rounded-xl text-center transition-all ${
-                        options.facialHair === option.value
-                          ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
-                          : 'bg-muted hover:bg-muted/80'
-                      }`}
-                    >
-                      <span className="text-sm font-medium">{option.label}</span>
-                      {options.facialHair === option.value && (
-                        <motion.div
-                          layoutId="facial-hair-check"
-                          className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center"
-                        >
-                          <Check className="w-2.5 h-2.5 text-white" />
-                        </motion.div>
-                      )}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          
-          {activeTab === 'colors' && (
-            <div className="space-y-4">
+
               {/* Skin Color */}
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -501,7 +512,7 @@ export function AvatarCustomizer({
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={() => updateOption('skinColor', color.value)}
-                      className={`w-10 h-10 rounded-full transition-all ${
+                      className={`w-8 h-8 rounded-full transition-all ${
                         options.skinColor === color.value
                           ? 'ring-2 ring-primary ring-offset-2'
                           : 'ring-1 ring-border hover:ring-2'
@@ -511,7 +522,7 @@ export function AvatarCustomizer({
                     >
                       {options.skinColor === color.value && (
                         <Check className={`w-4 h-4 mx-auto ${
-                          ['614335', '3a2a1d'].includes(color.value)
+                          ['614335', '3a2a1d', '8d5524', 'c26450'].includes(color.value)
                             ? 'text-white'
                             : 'text-black/50'
                         }`} />
@@ -533,25 +544,22 @@ export function AvatarCustomizer({
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={() => updateOption('backgroundColor', color.value)}
-                      className={`w-10 h-10 rounded-full transition-all ${
+                      className={`w-8 h-8 rounded-full transition-all ${
                         options.backgroundColor === color.value
                           ? 'ring-2 ring-primary ring-offset-2'
                           : 'ring-1 ring-border hover:ring-2'
                       }`}
                       style={{ 
-                        backgroundColor: color.value === 'transparent' 
-                          ? 'transparent' 
-                          : `#${color.value}`,
-                        backgroundImage: color.value === 'transparent'
-                          ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)'
-                          : undefined,
-                        backgroundSize: '8px 8px',
-                        backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px',
+                        backgroundColor: `#${color.value}`,
                       }}
                       title={color.name}
                     >
                       {options.backgroundColor === color.value && (
-                        <Check className="w-4 h-4 mx-auto text-primary" />
+                        <Check className={`w-4 h-4 mx-auto ${
+                          ['000000', '8b0000', '000080', '006400'].includes(color.value)
+                            ? 'text-white'
+                            : 'text-black'
+                        }`} />
                       )}
                     </motion.button>
                   ))}
