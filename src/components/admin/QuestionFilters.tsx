@@ -109,7 +109,8 @@ export function QuestionFilters({
           <option value="MULTIPLE_CHOICE">Multiple Choice</option>
           <option value="ESTIMATION">Schätzfragen</option>
           <option value="TRUE_FALSE">Wahr/Falsch</option>
-          <option value="COLLECTIVE_LIST">📋 Sammel-Liste</option>
+          <option value="COLLECTIVE_LIST">📝 Sammel-Liste</option>
+          <option value="HOT_BUTTON">🔥 Hot Button</option>
           <option value="SORTING">Sortieren</option>
           <option value="TEXT_INPUT">Freitext</option>
           <option value="MATCHING">Zuordnung</option>

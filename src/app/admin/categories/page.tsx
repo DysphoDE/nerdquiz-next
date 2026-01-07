@@ -103,7 +103,7 @@ async function CategoriesContent() {
                     Fragen
                   </Button>
                 </Link>
-                <Link href={`/admin/categories/${category.id}`}>
+                <Link href={`/admin/categories/${category.id}/edit`}>
                   <Button variant="ghost" size="sm" className="gap-1">
                     <Edit2 className="w-4 h-4" />
                     Bearbeiten

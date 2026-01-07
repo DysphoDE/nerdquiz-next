@@ -160,6 +160,8 @@ async function DashboardContent() {
                       {item.type === 'SORTING' && '📋 Sortieren'}
                       {item.type === 'TEXT_INPUT' && '✍️ Freitext'}
                       {item.type === 'MATCHING' && '🔗 Zuordnung'}
+                      {item.type === 'COLLECTIVE_LIST' && '📝 Sammel-Liste'}
+                      {item.type === 'HOT_BUTTON' && '🔥 Hot Button'}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {item._count}

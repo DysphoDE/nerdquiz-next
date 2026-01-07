@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -41,7 +41,11 @@ type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export default function EditQuestionPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const questionId = params.id as string;
+  
+  // Build return URL with filter params
+  const returnUrl = `/admin/questions${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -205,7 +209,7 @@ export default function EditQuestionPage() {
         throw new Error(error.message || 'Fehler beim Speichern');
       }
 
-      router.push('/admin/questions');
+      router.push(returnUrl);
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -225,7 +229,7 @@ export default function EditQuestionPage() {
         throw new Error('Fehler beim Löschen');
       }
 
-      router.push('/admin/questions');
+      router.push(returnUrl);
     } catch (error: any) {
       alert(error.message);
     }
@@ -264,7 +268,7 @@ export default function EditQuestionPage() {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Fehler</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Link href="/admin/questions">
+          <Link href={returnUrl}>
             <Button>Zurück zur Übersicht</Button>
           </Link>
         </div>
@@ -277,7 +281,7 @@ export default function EditQuestionPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Link href="/admin/questions">
+          <Link href={returnUrl}>
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Zurück
@@ -623,7 +627,7 @@ Delaware`}
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-4">
-          <Link href="/admin/questions">
+          <Link href={returnUrl}>
             <Button type="button" variant="ghost">
               Abbrechen
             </Button>

@@ -265,7 +265,16 @@ async function QuestionsContent({ searchParams }: { searchParams: SearchParams }
                 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
-                  <Link href={`/admin/questions/${question.id}/edit`}>
+                  <Link 
+                    href={`/admin/questions/${question.id}/edit?${new URLSearchParams({
+                      ...(searchParams.category && { category: searchParams.category }),
+                      ...(searchParams.type && { type: searchParams.type }),
+                      ...(searchParams.difficulty && { difficulty: searchParams.difficulty }),
+                      ...(searchParams.verified && { verified: searchParams.verified }),
+                      ...(searchParams.search && { search: searchParams.search }),
+                      ...(searchParams.page && { page: searchParams.page }),
+                    }).toString()}`}
+                  >
                     <Button variant="ghost" size="sm">
                       <Edit2 className="w-4 h-4" />
                     </Button>
