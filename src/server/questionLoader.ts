@@ -711,7 +711,7 @@ export async function getRandomHotButtonQuestions(excludeIds: string[] = [], cou
       questionType: 'HOT_BUTTON', // WICHTIG für bonusRound.ts Router
       questionIds: hotButtonQuestions.map(q => q.id),
       questions: hotButtonQuestions,
-      buzzerTimeout: 30,
+      buzzerTimeout: 25, // Reduced from 30s to 25s
       answerTimeout: 15,
       allowRebuzz: true,
       maxRebuzzAttempts: 2,

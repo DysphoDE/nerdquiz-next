@@ -6,10 +6,10 @@
  */
 
 import type { Server as SocketServer } from 'socket.io';
-import type { 
-  GameRoom, 
+import type {
+  GameRoom,
   GameState,
-  Player, 
+  Player,
   GameSettings,
 } from './types';
 import { createInitialGameState, DEFAULT_GAME_SETTINGS } from './types';
@@ -103,7 +103,7 @@ export function forEachRoom(callback: (room: GameRoom, code: string) => void): v
 export function createRoom(hostName: string, settings?: Partial<GameSettings>): { room: GameRoom; player: Player } {
   const roomCode = generateRoomCode();
   const playerId = generatePlayerId();
-  
+
   const player: Player = {
     id: playerId,
     socketId: '', // Will be set by caller
@@ -128,7 +128,7 @@ export function createRoom(hostName: string, settings?: Partial<GameSettings>): 
   };
 
   rooms.set(roomCode, room);
-  
+
   return { room, player };
 }
 
@@ -164,7 +164,7 @@ export function getConnectedPlayers(room: GameRoom): Player[] {
  * Gibt alle verbundenen menschlichen Spieler zurück (keine Bots)
  */
 export function getConnectedHumanPlayers(room: GameRoom): Player[] {
-  return Array.from(room.players.values()).filter(p => 
+  return Array.from(room.players.values()).filter(p =>
     p.isConnected && !p.socketId.startsWith('bot-')
   );
 }
@@ -246,10 +246,10 @@ export function roomToClient(room: GameRoom): Record<string, any> {
 
   // Convert BonusRound state for client
   let bonusRoundClient = null;
-  
+
   if (room.state.bonusRound) {
     const br = room.state.bonusRound;
-    
+
     if (br.type === 'collective_list') {
       bonusRoundClient = {
         type: 'collective_list',
@@ -293,6 +293,7 @@ export function roomToClient(room: GameRoom): Record<string, any> {
       };
     } else if (br.type === 'hot_button') {
       const currentQuestion = br.questions[br.currentQuestionIndex];
+      const questionTextLength = currentQuestion?.text.length || 1;
       bonusRoundClient = {
         type: 'hot_button',
         phase: br.phase,
@@ -301,25 +302,42 @@ export function roomToClient(room: GameRoom): Record<string, any> {
         description: br.description,
         category: br.category,
         categoryIcon: br.categoryIcon,
-        
+
         currentQuestionIndex: br.currentQuestionIndex,
         totalQuestions: br.questions.length,
         currentQuestionText: currentQuestion ? currentQuestion.text.substring(0, br.revealedChars) : '',
         isFullyRevealed: br.isFullyRevealed,
-        
+        revealedPercent: Math.round((br.revealedChars / questionTextLength) * 100),
+
         buzzedPlayerId: br.buzzedPlayerId,
         buzzedPlayerName: br.buzzedPlayerId ? room.players.get(br.buzzedPlayerId)?.name : undefined,
+        buzzedPlayerAvatarSeed: br.buzzedPlayerId ? room.players.get(br.buzzedPlayerId)?.avatarSeed : undefined,
         buzzerTimerEnd: br.phase === 'question_reveal' ? room.state.timerEnd : null,
-        
+        // Calculate buzzTimeMs from stored timestamp
+        buzzTimeMs: br.buzzedPlayerId && br.buzzTimestamps.get(br.buzzedPlayerId)
+          ? br.buzzTimestamps.get(br.buzzedPlayerId)! - br.questionStartTime
+          : undefined,
+
         answerTimerEnd: br.phase === 'answering' ? room.state.timerEnd : null,
-        lastAnswer: br.lastAnswer,
-        
+        lastAnswer: br.lastAnswer ? {
+          ...br.lastAnswer,
+          // IMPORTANT: Only reveal correct answer when question is truly over
+          // (correct answer given OR no more rebuzz attempts)
+          correctAnswer: (br.lastAnswer.correct || (br.maxRebuzzAttempts - br.attemptedPlayerIds.size) <= 0)
+            ? currentQuestion?.correctAnswer
+            : undefined,
+        } : undefined,
+
         attemptedPlayerIds: Array.from(br.attemptedPlayerIds),
         remainingAttempts: br.maxRebuzzAttempts - br.attemptedPlayerIds.size,
-        
+
         playerScores: Object.fromEntries(br.playerScores),
+
+        // Question history for displaying past questions
+        questionHistory: br.questionHistory || [],
       };
     }
+
   }
 
   return {
@@ -358,7 +376,7 @@ const dev = process.env.NODE_ENV !== 'production';
  */
 export function emitPhaseChange(room: GameRoom, io: SocketServer, phase: string): void {
   io.to(room.code).emit('phase_change', { phase });
-  
+
   // Notify bots about phase change (dev only)
   if (dev) {
     botManager.onPhaseChange(room.code, phase);

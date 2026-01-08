@@ -61,7 +61,7 @@ export interface Question {
 // GAME STATE
 // ============================================
 
-export type GamePhase = 
+export type GamePhase =
   | 'lobby'
   | 'round_announcement'      // NEU: Rundenankündigung mit Roulette
   | 'category_announcement'   // Legacy: wird zu round_announcement migriert
@@ -166,6 +166,24 @@ export interface CollectiveListBonusRound {
 // BONUS ROUND - HOT BUTTON
 // ============================================
 
+/** Result of a Hot Button question for history tracking */
+export interface HotButtonQuestionResult {
+  questionIndex: number;
+  questionText: string;
+  correctAnswer: string;
+  result: 'correct' | 'wrong' | 'timeout' | 'no_buzz';
+  answeredBy?: {
+    playerId: string;
+    playerName: string;
+    avatarSeed: string;
+    input: string;
+    points: number;
+    speedBonus: number;
+    revealedPercent: number;
+    buzzTimeMs: number;
+  };
+}
+
 export interface HotButtonBonusRound {
   type: 'hot_button';
   phase: 'intro' | 'question_reveal' | 'buzzer_active' | 'answering' | 'result' | 'finished';
@@ -174,18 +192,21 @@ export interface HotButtonBonusRound {
   description?: string;
   category?: string;
   categoryIcon?: string;
-  
+
   // Question state
   currentQuestionIndex: number;
   totalQuestions: number;
   currentQuestionText: string; // Progressively revealed text
   isFullyRevealed: boolean;
-  
+  revealedPercent: number; // 0-100, how much is revealed
+
   // Buzzer state
   buzzedPlayerId: string | null;
   buzzedPlayerName?: string;
+  buzzedPlayerAvatarSeed?: string;
   buzzerTimerEnd: number | null;
-  
+  buzzTimeMs?: number; // How fast they buzzed (ms from question start)
+
   // Answer state
   answerTimerEnd: number | null;
   lastAnswer?: {
@@ -193,16 +214,23 @@ export interface HotButtonBonusRound {
     playerName: string;
     input: string;
     correct: boolean;
+    correctAnswer?: string; // The actual correct answer (for display)
+    points?: number;
+    speedBonus?: number;
     confidence?: number;
   };
-  
+
   // Attempts
   attemptedPlayerIds: string[];
   remainingAttempts: number;
-  
+
   // Scores
   playerScores: Record<string, number>; // playerId -> Punkte in dieser Runde
+
+  // Question History
+  questionHistory: HotButtonQuestionResult[];
 }
+
 
 // Union type for all bonus round types
 export type BonusRoundState = CollectiveListBonusRound | HotButtonBonusRound;
@@ -358,15 +386,15 @@ export interface ClientState {
   isConnected: boolean;
   playerId: string | null;
   roomCode: string | null;
-  
+
   // Room
   room: RoomState | null;
-  
+
   // UI
   selectedAnswer: number | null;
   estimationValue: string;
   hasSubmitted: boolean;
-  
+
   // Results
   lastResults: AnswerResult[] | null;
   finalRankings: FinalRanking[] | null;

@@ -174,6 +174,24 @@ export interface HotButtonQuestion {
   pointsWrong: number;
 }
 
+/** Result of a Hot Button question for history tracking */
+export interface HotButtonQuestionResult {
+  questionIndex: number;
+  questionText: string;
+  correctAnswer: string;
+  result: 'correct' | 'wrong' | 'timeout' | 'no_buzz';
+  answeredBy?: {
+    playerId: string;
+    playerName: string;
+    avatarSeed: string;
+    input: string;
+    points: number;
+    speedBonus: number;
+    revealedPercent: number;
+    buzzTimeMs: number;
+  };
+}
+
 export interface ServerHotButtonState {
   type: 'hot_button';
   phase: 'intro' | 'question_reveal' | 'buzzer_active' | 'answering' | 'result' | 'finished';
@@ -182,23 +200,25 @@ export interface ServerHotButtonState {
   description?: string;
   category?: string;
   categoryIcon?: string;
-  
+
   // Questions
   questions: HotButtonQuestion[];
   currentQuestionIndex: number;
-  
+
   // Reveal state
   revealedChars: number;
   revealTimer: NodeJS.Timeout | null;
   isFullyRevealed: boolean;
-  
+  questionStartTime: number; // Timestamp when question started (for buzz speed calculation)
+
   // Buzzer state
   buzzedPlayerId: string | null;
   buzzerTimeout: NodeJS.Timeout | null;
   buzzerTimeoutDuration: number;
+  originalBuzzerTimerEnd: number | null; // Original timer end for rebuzz (to keep remaining time)
   buzzOrder: string[];
   buzzTimestamps: Map<string, number>; // playerId -> timestamp when they buzzed
-  
+
   // Answer state
   answerTimer: NodeJS.Timeout | null;
   answerTimeoutDuration: number;
@@ -209,15 +229,18 @@ export interface ServerHotButtonState {
     correct: boolean;
     confidence?: number;
   };
-  
+
   // Attempt tracking
   attemptedPlayerIds: Set<string>;
   maxRebuzzAttempts: number;
   allowRebuzz: boolean;
-  
+
   // Scoring
   playerScores: Map<string, number>;
-  
+
+  // Question History (for displaying past questions)
+  questionHistory: HotButtonQuestionResult[];
+
   // Settings
   fuzzyThreshold: number;
 }
@@ -229,24 +252,24 @@ export type ServerBonusRoundState = ServerCollectiveListState | ServerHotButtonS
 // GAME PHASE
 // ============================================
 
-export type GamePhase = 
-  | 'lobby' 
-  | 'round_announcement' 
-  | 'category_announcement' 
-  | 'category_voting' 
-  | 'category_wheel' 
-  | 'category_losers_pick' 
-  | 'category_dice_royale' 
-  | 'category_rps_duel' 
-  | 'question' 
-  | 'estimation' 
-  | 'revealing' 
-  | 'estimation_reveal' 
-  | 'scoreboard' 
-  | 'bonus_round_announcement' 
-  | 'bonus_round' 
-  | 'bonus_round_result' 
-  | 'final' 
+export type GamePhase =
+  | 'lobby'
+  | 'round_announcement'
+  | 'category_announcement'
+  | 'category_voting'
+  | 'category_wheel'
+  | 'category_losers_pick'
+  | 'category_dice_royale'
+  | 'category_rps_duel'
+  | 'question'
+  | 'estimation'
+  | 'revealing'
+  | 'estimation_reveal'
+  | 'scoreboard'
+  | 'bonus_round_announcement'
+  | 'bonus_round'
+  | 'bonus_round_result'
+  | 'final'
   | 'rematch_voting';
 
 // ============================================
@@ -335,13 +358,13 @@ export interface BonusRoundConfig {
   categoryIcon?: string;
   questionType?: string;
   questionIds?: string[]; // For tracking used questions
-  
+
   // For Collective List
   items?: Array<{ id: string; display: string; aliases: string[]; group?: string }>;
   timePerTurn?: number;
   pointsPerCorrect?: number;
   fuzzyThreshold?: number;
-  
+
   // For Hot Button
   questions?: HotButtonQuestion[];
   hotButtonQuestions?: HotButtonQuestion[]; // Legacy support
