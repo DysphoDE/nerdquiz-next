@@ -426,6 +426,10 @@ export function CollectiveListGame() {
                       // Small list OR finished: show all items in original order
                       visibleItems = items;
                     }
+
+                    // Dynamic animation delay: Max 1.5s total for the whole list
+                    const MAX_ANIMATION_DURATION = 1.5;
+                    const delayPerItem = Math.min(0.03, MAX_ANIMATION_DURATION / Math.max(visibleItems.length, 1));
                     
                     return (
                       <div key={group || 'all'}>
@@ -444,7 +448,7 @@ export function CollectiveListGame() {
                                 key={item.id}
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: groupIndex * 0.1 + index * 0.02 }}
+                                transition={{ delay: groupIndex * 0.1 + index * delayPerItem }}
                                 className={cn(
                                   'px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all',
                                   isRevealed
@@ -589,141 +593,98 @@ export function CollectiveListGame() {
                 className="mt-6 space-y-4"
               >
                 {/* Header Card */}
-                <Card className="glass p-6 text-center">
-                  <Trophy className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold mb-2">Bonusrunde beendet!</h3>
+                <Card className="glass p-6 text-center border-amber-500/20">
+                  <div className="inline-flex items-center justify-center p-3 rounded-full bg-amber-500/10 mb-4">
+                    <Trophy className="w-8 h-8 text-amber-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">Runde beendet!</h3>
                   <p className="text-muted-foreground mb-4">
-                    {bonusRound.revealedCount} von {bonusRound.totalItems} Begriffen gefunden
+                    Insgesamt <span className="text-green-500 font-bold">{bonusRound.revealedCount}</span> Begriffe gefunden
                   </p>
                   
                   {/* Winners */}
-                  <div className="flex flex-wrap gap-2 justify-center">
+                  <div className="flex flex-wrap gap-2 justify-center mb-2">
                     {bonusRound.eliminatedPlayers
                       .filter(e => e.rank === 1)
                       .map((winner) => (
-                        <motion.div
-                          key={winner.playerId}
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 300 }}
-                          className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30"
-                        >
-                          <Crown className="w-5 h-5 text-amber-500" />
-                          <GameAvatar seed={winner.avatarSeed} mood="superHappy" size="sm" />
-                          <span className="font-bold">{winner.playerName}</span>
-                          {winner.playerId === playerId && (
-                            <span className="text-xs text-amber-500">(Du!)</span>
-                          )}
-                        </motion.div>
+                        <div key={winner.playerId} className="flex flex-col items-center">
+                          <GameAvatar seed={winner.avatarSeed} mood="superHappy" size="lg" className="border-4 border-amber-500 shadow-xl" />
+                          <div className="mt-2 px-3 py-1 bg-amber-500 text-black font-bold rounded-full text-sm flex items-center gap-1">
+                            <Crown className="w-3 h-3" />
+                            {winner.playerName}
+                          </div>
+                        </div>
                       ))}
                   </div>
                 </Card>
 
-                {/* Score Breakdown Card */}
+                {/* Compact Score Breakdown */}
                 {bonusRoundResult && bonusRoundResult.playerScoreBreakdown.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
+                    transition={{ delay: 0.2 }}
                   >
-                    <Card className="glass p-4">
-                      <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4 text-center">
-                        Punkte-Übersicht
-                      </h4>
-                      <div className="space-y-3">
+                    <Card className="glass overflow-hidden">
+                      <div className="p-3 bg-muted/30 border-b border-white/5 flex justify-between items-center">
+                        <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                          Ergebnisse
+                        </h4>
+                        <span className="text-xs text-muted-foreground">Punkte dieser Runde</span>
+                      </div>
+                      <div className="divide-y divide-white/5">
                         {bonusRoundResult.playerScoreBreakdown.map((score, index) => {
                           const isMe = score.playerId === playerId;
                           const isWinner = score.rank === 1;
                           
-                          // Get this player's guesses from the log
-                          const playerGuesses = guessLog.filter(g => g.playerId === score.playerId);
-                          
                           return (
-                            <motion.div
+                            <div 
                               key={score.playerId}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.1 * index }}
                               className={cn(
-                                'p-3 rounded-xl transition-all',
-                                isWinner && 'bg-gradient-to-r from-amber-500/20 to-transparent border border-amber-500/30',
-                                isMe && !isWinner && 'bg-primary/10 border border-primary/30',
-                                !isWinner && !isMe && 'bg-muted/30'
+                                'flex items-center gap-3 p-3 sm:p-4 hover:bg-white/5 transition-colors',
+                                isWinner && 'bg-amber-500/5'
                               )}
                             >
-                              <div className="flex items-center gap-3">
-                                {/* Rank */}
-                                <div className={cn(
-                                  'w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0',
-                                  isWinner ? 'bg-amber-500 text-black' : 'bg-muted text-muted-foreground'
-                                )}>
-                                  {isWinner ? <Crown className="w-4 h-4" /> : score.rank}
-                                </div>
+                              {/* Rank */}
+                              <div className={cn(
+                                'w-8 h-8 flex items-center justify-center font-bold rounded-full shrink-0 text-sm',
+                                isWinner ? 'bg-amber-500 text-black' : 'bg-muted text-muted-foreground'
+                              )}>
+                                {score.rank}
+                              </div>
 
-                                {/* Avatar & Name */}
-                                <GameAvatar 
-                                  seed={score.avatarSeed} 
-                                  mood={isWinner ? 'superHappy' : 'neutral'} 
-                                  size="sm" 
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <span className={cn("font-bold truncate", isMe && "text-primary")}>
+                              {/* Player */}
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <GameAvatar seed={score.avatarSeed} size="xs" />
+                                <div className="flex flex-col">
+                                  <span className={cn("font-bold truncate text-sm sm:text-base", isMe && "text-primary")}>
                                     {score.playerName}
-                                    {isMe && <span className="text-xs ml-1">(Du)</span>}
                                   </span>
-                                </div>
-
-                                {/* Points Breakdown */}
-                                <div className="text-right text-sm shrink-0">
-                                  <div className="flex items-center gap-2 justify-end">
-                                    {score.correctAnswers > 0 && (
-                                      <span className="text-green-500">
-                                        {score.correctAnswers}×{bonusRoundResult.pointsPerCorrect}
-                                      </span>
-                                    )}
-                                    {score.rankBonus > 0 && (
-                                      <>
-                                        <span className="text-muted-foreground">+</span>
-                                        <span className="text-amber-500">🏆{score.rankBonus}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                  <div className="font-mono font-black text-lg text-primary">
-                                    +{score.totalPoints}
-                                  </div>
+                                  {score.correctAnswers > 0 && (
+                                    <span className="text-xs text-green-500 font-medium">
+                                      {score.correctAnswers} Begriffe gefunden
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              
-                              {/* Player's guesses */}
-                              {playerGuesses.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2 pl-11">
-                                  {playerGuesses.map((guess) => (
-                                    <span
-                                      key={guess.id}
-                                      className={cn(
-                                        'px-1.5 py-0.5 rounded text-xs font-medium',
-                                        guess.result === 'correct' && 'bg-green-500/20 text-green-400',
-                                        (guess.result === 'wrong' || guess.result === 'timeout' || guess.result === 'already_guessed') && 'bg-red-500/20 text-red-400'
-                                      )}
-                                    >
-                                      {guess.result === 'correct' ? guess.matchedDisplay : `"${guess.input || '⏰'}"`}
-                                    </span>
-                                  ))}
+
+                              {/* Bonuses */}
+                              {score.rankBonus > 0 && (
+                                <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-500 font-medium shrink-0">
+                                  <Trophy className="w-3 h-3" />
+                                  <span>+{score.rankBonus}</span>
                                 </div>
                               )}
-                            </motion.div>
+
+                              {/* Total */}
+                              <div className="text-right shrink-0 min-w-[60px]">
+                                <span className="font-mono font-black text-lg text-primary">
+                                  +{score.totalPoints}
+                                </span>
+                              </div>
+                            </div>
                           );
                         })}
-                      </div>
-                      
-                      {/* Legend */}
-                      <div className="flex gap-4 justify-center mt-4 text-xs text-muted-foreground">
-                        <span>
-                          <span className="text-green-500">●</span> Richtige Antworten
-                        </span>
-                        <span>
-                          <span className="text-amber-500">●</span> Gewinner-Bonus
-                        </span>
                       </div>
                     </Card>
                   </motion.div>

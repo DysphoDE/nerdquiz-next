@@ -282,46 +282,46 @@ export function EstimationRevealScreen() {
                 >
                   <Card
                     className={cn(
-                      'glass p-4 sm:p-5 relative overflow-hidden transition-all',
+                      'glass p-3 sm:p-5 relative overflow-hidden transition-all', // Reduziertes Padding auf Mobile
                       isWinner && 'border-yellow-500/50 bg-gradient-to-r from-yellow-500/20 via-yellow-500/10 to-transparent glow-accent',
                       result.playerId === myResult?.playerId && !isWinner && 'ring-2 ring-primary'
                     )}
                   >
                     {/* Rank badge */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4">
                       <motion.div
                         initial={{ scale: 0, rotate: -180 }}
                         animate={{ scale: 1, rotate: 0 }}
                         transition={{ delay: 0.2, type: 'spring' }}
                         className={cn(
-                          'w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl shrink-0',
+                          'w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-sm sm:text-xl shrink-0', // Kleiner auf Mobile
                           rank === 1 && 'bg-yellow-500 text-black',
                           rank === 2 && 'bg-gray-400 text-black',
                           rank === 3 && 'bg-amber-700 text-white',
                           rank > 3 && 'bg-muted text-muted-foreground'
                         )}
                       >
-                        {rank === 1 ? <Crown className="w-6 h-6" /> : rank}
+                        {rank === 1 ? <Crown className="w-4 h-4 sm:w-6 sm:h-6" /> : rank}
                       </motion.div>
 
                       {/* Avatar */}
                       <img
                         src={getAvatarUrlFromSeed(result.avatarSeed, result.absDiff === 0 ? 'superHappy' : diffPercent <= 20 ? 'happy' : diffPercent <= 50 ? 'confused' : 'sad')}
                         alt=""
-                        className="w-12 h-12 rounded-full bg-muted shrink-0"
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-muted shrink-0" // Kleiner auf Mobile
                       />
 
                       {/* Name & Estimation */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-lg truncate">{result.playerName}</p>
-                        <div className="flex items-center gap-2 text-sm">
+                        <p className="font-bold text-sm sm:text-lg truncate">{result.playerName}</p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm">
                           <span className="text-muted-foreground">Geschätzt:</span>
                           <span className="font-mono font-bold text-primary">
                             {result.estimation?.toLocaleString() ?? '—'}
                           </span>
                           {result.absDiff !== undefined && result.absDiff !== null && (
                             <span className={cn(
-                              'flex items-center gap-1 text-xs px-2 py-0.5 rounded-full',
+                              'flex items-center gap-1 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full',
                               result.absDiff === 0 
                                 ? 'bg-green-500/20 text-green-500'
                                 : 'bg-red-500/20 text-red-500'
@@ -345,7 +345,7 @@ export function EstimationRevealScreen() {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.3 }}
-                          className="text-2xl mb-1"
+                          className="text-xl sm:text-2xl mb-0.5 sm:mb-1"
                         >
                           {quip.emoji}
                         </motion.div>
@@ -362,7 +362,7 @@ export function EstimationRevealScreen() {
                           animate={{ scale: 1 }}
                           transition={{ delay: 0.5, type: 'spring' }}
                           className={cn(
-                            'font-mono font-bold text-lg',
+                            'font-mono font-bold text-base sm:text-lg',
                             result.points > 0 ? 'text-green-500' : 'text-muted-foreground'
                           )}
                         >
@@ -376,7 +376,7 @@ export function EstimationRevealScreen() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       transition={{ delay: 0.6 }}
-                      className="hidden sm:flex items-center justify-end gap-4 mt-3 pt-3 border-t border-white/10"
+                      className="hidden sm:flex items-center justify-end gap-4 pt-2 border-t border-white/10"
                     >
                       {/* Accuracy Points */}
                       {result.accuracyPoints !== undefined && (
@@ -422,9 +422,9 @@ export function EstimationRevealScreen() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.4 }}
-                      className="sm:hidden mt-3 pt-3 border-t border-white/10"
+                      className="sm:hidden pt-2 border-t border-white/10"
                     >
-                      <p className="text-xs text-muted-foreground text-center mb-2">
+                      <p className="text-xs text-muted-foreground text-center mb-1"> {/* mb-2 -> mb-1 */}
                         {quip.text}
                       </p>
                       <div className="flex items-center justify-center gap-3 text-xs">

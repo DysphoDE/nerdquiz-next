@@ -357,7 +357,15 @@ export function QuestionScreen() {
                       // Smaller min-height on mobile during reveal
                       minHeight: isExpanded ? undefined : undefined,
                     }}
-                    transition={{ delay: index * 0.1, layout: { duration: 0.5, type: 'spring' } }}
+                    transition={{ 
+                      delay: index * 0.05, // Schnelleres Staggering für snappier feel
+                      layout: { 
+                        type: 'spring',
+                        stiffness: 300,
+                        damping: 30, // Höhere Damping verhindert "Wackeln" beim Kleinwerden
+                        mass: 1
+                      } 
+                    }}
                     className={cn(
                       "relative",
                       // Ensure min-height on desktop, smaller on mobile
@@ -418,12 +426,12 @@ export function QuestionScreen() {
                       </div>
 
                       {/* Avatar Landing Zone */}
-                      <AnimatePresence>
+                      <AnimatePresence mode="popLayout">
                         {isExpanded && (
                           <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
+                            exit={{ opacity: 0, height: 0, transition: { duration: 0.2 } }}
                             className={cn(
                               "mt-4 min-h-[80px] flex flex-wrap gap-3 justify-start items-end",
                               // Smaller on mobile

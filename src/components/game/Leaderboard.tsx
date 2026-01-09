@@ -78,20 +78,26 @@ export function Leaderboard({
                   {customAvatar ? customAvatar(player) : (
                     <GameAvatar 
                       seed={player.avatarSeed} 
-                      mood={isEliminated ? 'sad' : player.hasAnswered ? 'hopeful' : 'neutral'} 
+                      mood={isEliminated ? 'sad' : !player.isConnected ? 'confused' : player.hasAnswered ? 'hopeful' : 'neutral'} 
                       size="xs" 
+                      className={!player.isConnected ? 'grayscale' : ''}
                     />
                   )}
-                  {isEliminated && (
+                  {isEliminated ? (
                     <div className="absolute -top-1 -right-1 bg-background rounded-full">
                       <X className="w-3 h-3 text-red-500" />
+                    </div>
+                  ) : !player.isConnected && (
+                    <div className="absolute -top-1 -right-1 bg-background rounded-full">
+                      <WifiOff className="w-3 h-3 text-red-500" />
                     </div>
                   )}
                 </div>
 
                 <span className={cn(
                   "font-medium truncate max-w-[80px]",
-                  isEliminated && "line-through text-muted-foreground"
+                  isEliminated && "line-through text-muted-foreground",
+                  !player.isConnected && "text-muted-foreground italic"
                 )}>
                   {player.name}
                 </span>
@@ -184,18 +190,23 @@ export function Leaderboard({
                   <>
                     <GameAvatar 
                       seed={player.avatarSeed} 
-                      mood={isEliminated ? 'sad' : player.streak > 2 ? 'happy' : 'neutral'} 
+                      mood={isEliminated ? 'sad' : !player.isConnected ? 'confused' : player.streak > 2 ? 'happy' : 'neutral'} 
                       size="md" 
+                      className={!player.isConnected ? 'grayscale' : ''}
                     />
-                    {isEliminated && (
+                    {isEliminated ? (
                       <div className="absolute inset-0 bg-background/50 rounded-full flex items-center justify-center">
                         <X className="w-6 h-6 text-red-500" />
+                      </div>
+                    ) : !player.isConnected && (
+                      <div className="absolute -top-1 -right-1 bg-background rounded-full p-0.5 border border-border">
+                        <WifiOff className="w-4 h-4 text-red-500" />
                       </div>
                     )}
                   </>
                 )}
                 
-                {showAnswerStatus && player.hasAnswered && !isEliminated && (
+                {showAnswerStatus && player.hasAnswered && !isEliminated && player.isConnected && (
                   <motion.div 
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -212,7 +223,8 @@ export function Leaderboard({
                 <div className="flex items-center gap-2">
                   <span className={cn(
                     "font-bold truncate",
-                    isEliminated && "line-through text-muted-foreground"
+                    isEliminated && "line-through text-muted-foreground",
+                    !player.isConnected && "text-muted-foreground italic"
                   )}>
                     {player.name}
                   </span>
@@ -221,7 +233,11 @@ export function Leaderboard({
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {status?.text ? (
+                  {!player.isConnected ? (
+                    <span className="text-red-500 font-medium flex items-center gap-1">
+                      <WifiOff className="w-3 h-3" /> Offline
+                    </span>
+                  ) : status?.text ? (
                     <span className={cn('font-medium', status.color)}>{status.text}</span>
                   ) : isEliminated ? (
                     <span className="text-red-500 font-medium">Ausgeschieden</span>
@@ -231,10 +247,6 @@ export function Leaderboard({
                       {player.streak}
                     </span>
                   ) : null}
-                  
-                  {!player.isConnected && (
-                    <WifiOff className="w-3 h-3 text-red-500 ml-1" />
-                  )}
                 </div>
               </div>
 
