@@ -404,51 +404,67 @@ export function CollectiveListGame() {
               {/* Items Grid */}
               <Card className="glass p-3 sm:p-4">
                 <div className="space-y-4 max-h-[40vh] sm:max-h-none overflow-y-auto">
-                  {groupedItems.map(({ group, items }, groupIndex) => {
-                    // Threshold for "large list" behavior
-                    const LARGE_LIST_THRESHOLD = 50;
-                    const isLargeList = items.length > LARGE_LIST_THRESHOLD;
-                    
-                    // For large lists: limit hidden items, show revealed first
-                    // For small lists: keep original order, show all items at their positions
-                    let visibleItems: typeof items;
-                    let hiddenCount = 0;
-                    
-                    if (isLargeList && !isFinished) {
-                      // Large list during gameplay: show revealed first + limited hidden
-                      const MAX_HIDDEN_SHOWN = 50;
-                      const revealedItems = items.filter(item => !!item.guessedBy);
-                      const hiddenItems = items.filter(item => !item.guessedBy);
-                      const hiddenToShow = hiddenItems.slice(0, Math.max(0, MAX_HIDDEN_SHOWN - revealedItems.length));
-                      hiddenCount = hiddenItems.length - hiddenToShow.length;
-                      visibleItems = [...revealedItems, ...hiddenToShow];
-                    } else {
-                      // Small list OR finished: show all items in original order
-                      visibleItems = items;
-                    }
+                  {(() => {
+                    // First pass: calculate visible items for all groups
+                    const allVisibleItems = groupedItems.flatMap(({ items }) => {
+                      const LARGE_LIST_THRESHOLD = 50;
+                      const isLargeList = items.length > LARGE_LIST_THRESHOLD;
+                      
+                      if (isLargeList && !isFinished) {
+                        const MAX_HIDDEN_SHOWN = 50;
+                        const revealedItems = items.filter(item => !!item.guessedBy);
+                        const hiddenItems = items.filter(item => !item.guessedBy);
+                        const hiddenToShow = hiddenItems.slice(0, Math.max(0, MAX_HIDDEN_SHOWN - revealedItems.length));
+                        return [...revealedItems, ...hiddenToShow];
+                      } else {
+                        return items;
+                      }
+                    });
 
-                    // Dynamic animation delay: Max 1.5s total for the whole list
+                    // Dynamic animation delay: Max 1.5s total for ALL items across ALL groups
                     const MAX_ANIMATION_DURATION = 1.5;
-                    const delayPerItem = Math.min(0.03, MAX_ANIMATION_DURATION / Math.max(visibleItems.length, 1));
+                    const delayPerItem = Math.min(0.03, MAX_ANIMATION_DURATION / Math.max(allVisibleItems.length, 1));
                     
-                    return (
-                      <div key={group || 'all'}>
-                        {group && (
-                          <h4 className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
-                            {group}
-                          </h4>
-                        )}
-                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                          {visibleItems.map((item, index) => {
-                            const isRevealed = !!item.guessedBy;
-                            const isUnrevealedAtEnd = isFinished && !isRevealed;
-                            
-                            return (
-                              <motion.div
-                                key={item.id}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: groupIndex * 0.1 + index * delayPerItem }}
+                    // Second pass: render with global index
+                    let globalIndex = 0;
+                    
+                    return groupedItems.map(({ group, items }, groupIndex) => {
+                      const LARGE_LIST_THRESHOLD = 50;
+                      const isLargeList = items.length > LARGE_LIST_THRESHOLD;
+                      
+                      let visibleItems: typeof items;
+                      let hiddenCount = 0;
+                      
+                      if (isLargeList && !isFinished) {
+                        const MAX_HIDDEN_SHOWN = 50;
+                        const revealedItems = items.filter(item => !!item.guessedBy);
+                        const hiddenItems = items.filter(item => !item.guessedBy);
+                        const hiddenToShow = hiddenItems.slice(0, Math.max(0, MAX_HIDDEN_SHOWN - revealedItems.length));
+                        hiddenCount = hiddenItems.length - hiddenToShow.length;
+                        visibleItems = [...revealedItems, ...hiddenToShow];
+                      } else {
+                        visibleItems = items;
+                      }
+                    
+                      return (
+                        <div key={group || 'all'}>
+                          {group && (
+                            <h4 className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+                              {group}
+                            </h4>
+                          )}
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                            {visibleItems.map((item, index) => {
+                              const isRevealed = !!item.guessedBy;
+                              const isUnrevealedAtEnd = isFinished && !isRevealed;
+                              const itemGlobalIndex = globalIndex++;
+                              
+                              return (
+                                <motion.div
+                                  key={item.id}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: itemGlobalIndex * delayPerItem }}
                                 className={cn(
                                   'px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all',
                                   isRevealed
@@ -467,7 +483,7 @@ export function CollectiveListGame() {
                                   <motion.span 
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    transition={{ delay: index * 0.05 }}
+                                    transition={{ delay: itemGlobalIndex * delayPerItem }}
                                     className="flex items-center gap-1"
                                   >
                                     <X className="w-3 h-3" />
@@ -491,9 +507,10 @@ export function CollectiveListGame() {
                             </motion.div>
                           )}
                         </div>
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </Card>
 

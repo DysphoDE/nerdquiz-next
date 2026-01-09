@@ -81,19 +81,39 @@ export function QuestionDebugPanel() {
   
   // Sync local difficulty with server when question changes
   useEffect(() => {
+    // For normal questions
     if (currentQuestion?.difficulty) {
       setLocalDifficulty(currentQuestion.difficulty);
-    } else {
+    } 
+    // For Hot Button bonus rounds - get difficulty from current question
+    else if (bonusRound?.type === 'hot_button' && bonusRound.questions && bonusRound.currentQuestionIndex !== undefined) {
+      const currentHotButtonQuestion = bonusRound.questions[bonusRound.currentQuestionIndex];
+      setLocalDifficulty(currentHotButtonQuestion?.difficulty as Difficulty | undefined);
+    }
+    else {
       setLocalDifficulty(undefined);
     }
-  }, [currentQuestion?.id, currentQuestion?.difficulty]);
+  }, [currentQuestion?.id, currentQuestion?.difficulty, bonusRound?.type, bonusRound?.currentQuestionIndex, bonusRound?.questions]);
 
   // Don't render if not in dev mode or no room
   if (!isDevMode || !room) return null;
   
   // Determine what we can edit
-  // Normal questions have an ID directly, bonus rounds have questionId in bonusRound state
-  const questionId = currentQuestion?.id || bonusRound?.questionId;
+  // Normal questions have an ID directly
+  // Collective List bonus rounds have questionId in bonusRound state
+  // Hot Button bonus rounds have multiple questions, get the current one
+  let questionId: string | undefined;
+  if (currentQuestion?.id) {
+    questionId = currentQuestion.id;
+  } else if (bonusRound?.questionId) {
+    // Collective List
+    questionId = bonusRound.questionId;
+  } else if (bonusRound?.type === 'hot_button' && bonusRound.questions && bonusRound.currentQuestionIndex !== undefined) {
+    // Hot Button - get current question from array
+    const currentHotButtonQuestion = bonusRound.questions[bonusRound.currentQuestionIndex];
+    questionId = currentHotButtonQuestion?.id;
+  }
+  
   const hasEditableQuestion = !!questionId;
   const isBonusRound = room.phase === 'bonus_round';
   
@@ -337,7 +357,11 @@ export function QuestionDebugPanel() {
                       </div>
                       <div className="flex items-center justify-between text-zinc-400">
                         <span>Typ</span>
-                        <span className="font-mono">{isBonusRound ? 'collective_list' : currentQuestion?.type || '?'}</span>
+                        <span className="font-mono">
+                          {isBonusRound 
+                            ? bonusRound?.type || 'bonus_round'
+                            : currentQuestion?.type || '?'}
+                        </span>
                       </div>
                     </div>
 

@@ -638,7 +638,7 @@ function handleDevCommand(io: SocketServer) {
         break;
       }
 
-      case 'start_bonus_round': {
+      case 'start_collective_list_round': {
         const excludeIds = Array.from(room.state.usedBonusQuestionIds);
         const bonusQuestion = await questionLoader.getRandomBonusRoundQuestion(excludeIds);
         if (bonusQuestion) {
@@ -654,9 +654,24 @@ function handleDevCommand(io: SocketServer) {
             pointsPerCorrect: bonusQuestion.pointsPerCorrect,
             fuzzyThreshold: bonusQuestion.fuzzyThreshold,
           });
-          io.to(room.code).emit('dev_notification', { message: `Bonusrunde gestartet: ${bonusQuestion.topic}` });
+          io.to(room.code).emit('dev_notification', { message: `Collective List gestartet: ${bonusQuestion.topic}` });
         } else {
-          io.to(room.code).emit('dev_notification', { message: 'Keine Bonusrunden-Frage in DB gefunden!' });
+          io.to(room.code).emit('dev_notification', { message: 'Keine Collective List-Fragen in DB gefunden!' });
+        }
+        break;
+      }
+
+      case 'start_hot_button_round': {
+        const excludeIds = Array.from(room.state.usedBonusQuestionIds);
+        const hotButtonConfig = await questionLoader.getRandomHotButtonQuestions(excludeIds, 5);
+        if (hotButtonConfig) {
+          // Add all question IDs to used set
+          hotButtonConfig.questionIds.forEach((id: string) => room.state.usedBonusQuestionIds.add(id));
+          
+          startBonusRound(room, io, hotButtonConfig);
+          io.to(room.code).emit('dev_notification', { message: `Hot Button Runde gestartet (${hotButtonConfig.questions.length} Fragen)` });
+        } else {
+          io.to(room.code).emit('dev_notification', { message: 'Keine Hot Button-Fragen in DB gefunden!' });
         }
         break;
       }

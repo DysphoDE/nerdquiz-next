@@ -85,7 +85,8 @@ export function DevPanel() {
   const skipToScoreboard = () => devCommand('skip_to_scoreboard');
   const skipToFinal = () => devCommand('skip_to_final');
   const setRandomScores = () => devCommand('randomize_scores');
-  const startBonusRound = () => devCommand('start_bonus_round');
+  const startCollectiveListRound = () => devCommand('start_collective_list_round');
+  const startHotButtonRound = () => devCommand('start_hot_button_round');
   const startEndlessRound = () => {
     if (!selectedEndlessCategory) return;
     devCommand('start_endless_round', { categoryId: selectedEndlessCategory });
@@ -203,8 +204,9 @@ export function DevPanel() {
                       <h4 className="text-xs text-zinc-400 mb-2 uppercase tracking-wider">
                         Bonusrunde
                       </h4>
-                      <div className="grid grid-cols-1 gap-2">
-                        <DevButton onClick={startBonusRound} icon={ListChecks} label="📋 Sammel-Liste starten" color="amber" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <DevButton onClick={startCollectiveListRound} icon={ListChecks} label="📋 Sammel-Liste" color="amber" />
+                        <DevButton onClick={startHotButtonRound} icon={Zap} label="⚡ Hot Button" color="rose" />
                       </div>
                     </div>
 
