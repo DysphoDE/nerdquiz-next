@@ -5,6 +5,14 @@
  */
 
 import { z } from 'zod';
+import {
+  PLAYER_VALIDATION,
+  ROOM_VALIDATION,
+  SETTINGS_VALIDATION,
+  ANSWER_VALIDATION,
+  AVATAR_VALIDATION,
+  DEV_MODE_VALIDATION,
+} from '@/config/constants';
 
 // ============================================
 // COMMON SCHEMAS
@@ -12,18 +20,18 @@ import { z } from 'zod';
 
 /** 4-stelliger Room Code (nur erlaubte Zeichen) */
 const RoomCodeSchema = z.string()
-    .length(4, 'Room-Code muss 4 Zeichen haben')
-    .regex(/^[A-Z2-9]+$/, 'Ungültiger Room-Code');
+    .length(ROOM_VALIDATION.CODE_LENGTH, 'Room-Code muss 4 Zeichen haben')
+    .regex(ROOM_VALIDATION.CODE_REGEX, 'Ungültiger Room-Code');
 
 /** Player ID Format */
 const PlayerIdSchema = z.string()
-    .min(3, 'Player-ID zu kurz')
-    .regex(/^p_[a-z0-9]+$/, 'Ungültiges Player-ID Format');
+    .min(PLAYER_VALIDATION.ID_MIN_LENGTH, 'Player-ID zu kurz')
+    .regex(PLAYER_VALIDATION.ID_REGEX, 'Ungültiges Player-ID Format');
 
 /** Player Name */
 const PlayerNameSchema = z.string()
-    .min(1, 'Name darf nicht leer sein')
-    .max(16, 'Name zu lang')
+    .min(PLAYER_VALIDATION.NAME_MIN_LENGTH, 'Name darf nicht leer sein')
+    .max(PLAYER_VALIDATION.NAME_MAX_LENGTH, 'Name zu lang')
     .trim();
 
 // ============================================
@@ -32,13 +40,13 @@ const PlayerNameSchema = z.string()
 
 export const CreateRoomSchema = z.object({
     playerName: PlayerNameSchema,
-    avatarOptions: z.string().max(500).optional(),
+    avatarOptions: z.string().max(AVATAR_VALIDATION.OPTIONS_MAX_LENGTH).optional(),
 });
 
 export const JoinRoomSchema = z.object({
     roomCode: RoomCodeSchema,
     playerName: PlayerNameSchema,
-    avatarOptions: z.string().max(500).optional(),
+    avatarOptions: z.string().max(AVATAR_VALIDATION.OPTIONS_MAX_LENGTH).optional(),
 });
 
 export const ReconnectPlayerSchema = z.object({
@@ -54,14 +62,14 @@ export const UpdateSettingsSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
     settings: z.object({
-        maxRounds: z.number().int().min(1).max(20).optional(),
-        questionsPerRound: z.number().int().min(1).max(20).optional(),
-        timePerQuestion: z.number().int().min(5).max(60).optional(),
-        bonusRoundChance: z.number().int().min(0).max(100).optional(),
+        maxRounds: z.number().int().min(SETTINGS_VALIDATION.ROUNDS_MIN).max(SETTINGS_VALIDATION.ROUNDS_MAX).optional(),
+        questionsPerRound: z.number().int().min(SETTINGS_VALIDATION.QUESTIONS_PER_ROUND_MIN).max(SETTINGS_VALIDATION.QUESTIONS_PER_ROUND_MAX).optional(),
+        timePerQuestion: z.number().int().min(SETTINGS_VALIDATION.TIME_PER_QUESTION_MIN).max(SETTINGS_VALIDATION.TIME_PER_QUESTION_MAX).optional(),
+        bonusRoundChance: z.number().int().min(SETTINGS_VALIDATION.BONUS_CHANCE_MIN).max(SETTINGS_VALIDATION.BONUS_CHANCE_MAX).optional(),
         finalRoundAlwaysBonus: z.boolean().optional(),
         enableEstimation: z.boolean().optional(),
         enableMediaQuestions: z.boolean().optional(),
-        hotButtonQuestionsPerRound: z.number().int().min(1).max(10).optional(),
+        hotButtonQuestionsPerRound: z.number().int().min(SETTINGS_VALIDATION.HOT_BUTTON_QUESTIONS_MIN).max(SETTINGS_VALIDATION.HOT_BUTTON_QUESTIONS_MAX).optional(),
     }),
 });
 
@@ -72,13 +80,13 @@ export const UpdateSettingsSchema = z.object({
 export const VoteCategorySchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    categoryId: z.string().min(1).max(100),
+    categoryId: z.string().min(1).max(100), // Category IDs (UUIDs or custom IDs)
 });
 
 export const LoserPickCategorySchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    categoryId: z.string().min(1).max(100),
+    categoryId: z.string().min(1).max(100), // Category IDs (UUIDs or custom IDs)
 });
 
 export const DiceRoyaleRollSchema = z.object({
@@ -111,7 +119,7 @@ export const RPSDuelPickSchema = z.object({
 export const SubmitAnswerSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    answerIndex: z.number().int().min(0).max(9),
+    answerIndex: z.number().int().min(ANSWER_VALIDATION.ANSWER_INDEX_MIN).max(ANSWER_VALIDATION.ANSWER_INDEX_MAX),
 });
 
 export const SubmitEstimationSchema = z.object({
@@ -127,7 +135,7 @@ export const SubmitEstimationSchema = z.object({
 export const BonusRoundSubmitSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    answer: z.string().max(500),
+    answer: z.string().max(ANSWER_VALIDATION.TEXT_ANSWER_MAX_LENGTH),
 });
 
 export const BonusRoundSkipSchema = z.object({
@@ -143,7 +151,7 @@ export const HotButtonBuzzSchema = z.object({
 export const HotButtonSubmitSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    answer: z.string().max(500),
+    answer: z.string().max(ANSWER_VALIDATION.TEXT_ANSWER_MAX_LENGTH),
 });
 
 // ============================================
@@ -178,7 +186,7 @@ export const RerollAvatarSchema = z.object({
 export const UpdateAvatarSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    avatarOptions: z.string().max(500),
+    avatarOptions: z.string().max(AVATAR_VALIDATION.OPTIONS_MAX_LENGTH),
 });
 
 // ============================================
@@ -188,13 +196,13 @@ export const UpdateAvatarSchema = z.object({
 export const EnableDevModeSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    secretCode: z.string().max(100),
+    secretCode: z.string().max(DEV_MODE_VALIDATION.SECRET_CODE_MAX_LENGTH),
 });
 
 export const DevCommandSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
-    command: z.string().max(50),
+    command: z.string().max(DEV_MODE_VALIDATION.COMMAND_MAX_LENGTH),
     params: z.record(z.string(), z.unknown()).optional(),
 });
 

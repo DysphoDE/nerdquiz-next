@@ -24,6 +24,10 @@ import {
 import { botManager } from '../botManager';
 import * as questionLoader from '../questionLoader';
 import {
+  UI_TIMING,
+  GAME_TIMERS,
+} from '@/config/constants';
+import {
   selectCategoryMode,
   getRandomCategoriesForVoting,
   startCategoryVoting,
@@ -215,7 +219,7 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
         if (pendingQuestion) {
           startBonusRound(currentRoom, io, pendingQuestion);
         }
-      }, 5500);
+      }, UI_TIMING.WHEEL_ANIMATION);
       
       return;
     } else {
@@ -410,7 +414,7 @@ export function showFinalResults(room: GameRoom, io: SocketServer): void {
     if (currentRoom && currentRoom.state.phase === 'final') {
       startRematchVoting(currentRoom, io);
     }
-  }, 8000);
+  }, UI_TIMING.FINAL_RESULTS);
 }
 
 // ============================================
@@ -447,7 +451,7 @@ export function startRematchVoting(room: GameRoom, io: SocketServer): void {
       });
       finalizeRematchVoting(currentRoom, io);
     }
-  }, 20000);
+  }, GAME_TIMERS.REMATCH_VOTING);
 }
 
 /**
@@ -518,7 +522,7 @@ export function finalizeRematchVoting(room: GameRoom, io: SocketServer): void {
     
     setTimeout(() => {
       cleanupRoom(room.code);
-    }, 5000);
+    }, UI_TIMING.STANDARD_TRANSITION + 3000); // Extra delay for cleanup warning
     return;
   }
   

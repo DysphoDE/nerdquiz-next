@@ -14,6 +14,11 @@ import type {
 } from './types';
 import { createInitialGameState, DEFAULT_GAME_SETTINGS } from './types';
 import { botManager } from './botManager';
+import {
+  ROOM_LIMITS,
+  DICE_ROYALE,
+  GAME_TIMERS,
+} from '@/config/constants';
 
 // ============================================
 // ROOM STORAGE
@@ -26,13 +31,13 @@ const rooms = new Map<string, GameRoom>();
 // ============================================
 
 /**
- * Generiert einen 4-stelligen Room Code
+ * Generiert einen Room Code
  * Verwendet nur eindeutige Zeichen (kein O/0, I/1, etc.)
  */
 export function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const chars = ROOM_LIMITS.CODE_CHARS;
   let code = '';
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < ROOM_LIMITS.CODE_LENGTH; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   // Rekursiv neu generieren bei Kollision
@@ -137,10 +142,10 @@ export function createRoom(hostName: string, settings?: Partial<GameSettings>): 
 // ============================================
 
 /**
- * Würfelt eine Zahl zwischen 1 und 6
+ * Würfelt einen Würfel
  */
 export function rollDie(): number {
-  return Math.floor(Math.random() * 6) + 1;
+  return Math.floor(Math.random() * DICE_ROYALE.DICE_SIDES) + 1;
 }
 
 /**
@@ -445,7 +450,7 @@ export function cleanupRoom(code: string): void {
  * 
  * WICHTIG: Cleanup-Timer ist cancellable - wenn Spieler reconnecten, wird der Timer gelöscht
  */
-export function scheduleRoomCleanupIfEmpty(room: GameRoom, io: SocketServer, delayMs: number = 60000): void {
+export function scheduleRoomCleanupIfEmpty(room: GameRoom, io: SocketServer, delayMs: number = GAME_TIMERS.EMPTY_ROOM_CLEANUP): void {
   // Clear any existing cleanup timer
   if (room.cleanupTimer) {
     clearTimeout(room.cleanupTimer);

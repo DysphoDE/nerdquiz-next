@@ -18,6 +18,10 @@ import {
   emitPhaseChange,
   broadcastRoomUpdate,
 } from '../roomStore';
+import {
+  CHOICE_SCORING,
+  ESTIMATION_SCORING,
+} from '@/config/constants';
 
 // ============================================
 // STATISTICS HELPER
@@ -317,9 +321,9 @@ export function showAnswer(room: GameRoom, io: SocketServer): void {
     let streakBonus = 0;
 
     if (correct) {
-      basePoints = 1000;
-      timeBonus = Math.max(0, Math.floor((player.answerTime || 0) / 100));
-      streakBonus = Math.min(player.streak * 50, 250);
+      basePoints = CHOICE_SCORING.BASE_POINTS;
+      timeBonus = Math.max(0, Math.floor((player.answerTime || 0) / CHOICE_SCORING.TIME_BONUS_DIVISOR));
+      streakBonus = Math.min(player.streak * CHOICE_SCORING.STREAK_MULTIPLIER, CHOICE_SCORING.MAX_STREAK_BONUS);
       player.streak++;
     } else {
       player.streak = 0;
@@ -429,15 +433,24 @@ export function showEstimationAnswer(room: GameRoom, io: SocketServer): void {
         ? Math.abs(p.estimationAnswer - correctValue)
         : Infinity,
     }))
-    .sort((a, b) => a.absDiff - b.absDiff);
+    .sort((a, b) => {
+      // Primary sort: by accuracy (absDiff)
+      if (a.absDiff !== b.absDiff) {
+        return a.absDiff - b.absDiff;
+      }
+      // Tiebreaker: faster answer wins (lower answerTime = faster)
+      const timeA = a.player.answerTime ?? Infinity;
+      const timeB = b.player.answerTime ?? Infinity;
+      return timeA - timeB;
+    });
 
   const results: AnswerResult[] = [];
 
-  // Accuracy-based scoring system
-  const rankBonuses = [300, 200, 100];
-  const baseRankBonus = 50;
-  const maxAccuracyPoints = 1000;
-  const perfectBonusValue = 500;
+  // Accuracy-based scoring system (using constants)
+  const rankBonuses = ESTIMATION_SCORING.RANK_BONUSES;
+  const baseRankBonus = ESTIMATION_SCORING.BASE_RANK_BONUS;
+  const maxAccuracyPoints = ESTIMATION_SCORING.MAX_ACCURACY_POINTS;
+  const perfectBonusValue = ESTIMATION_SCORING.PERFECT_BONUS;
 
   // Track total questions
   room.state.statistics.totalQuestions++;
@@ -453,8 +466,8 @@ export function showEstimationAnswer(room: GameRoom, io: SocketServer): void {
       const percentageOff = (entry.absDiff / Math.max(Math.abs(correctValue), 1)) * 100;
 
       // Accuracy points: Linear scale
-      if (percentageOff <= 100) {
-        accuracyPoints = Math.round(maxAccuracyPoints * (1 - percentageOff / 100));
+      if (percentageOff <= ESTIMATION_SCORING.MAX_DEVIATION_PERCENT) {
+        accuracyPoints = Math.round(maxAccuracyPoints * (1 - percentageOff / ESTIMATION_SCORING.MAX_DEVIATION_PERCENT));
       } else {
         accuracyPoints = 0;
       }

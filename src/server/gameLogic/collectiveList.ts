@@ -20,6 +20,11 @@ import {
 } from '../roomStore';
 import { botManager } from '../botManager';
 import { checkAnswer as fuzzyCheckAnswer } from '@/lib/fuzzyMatch';
+import {
+  COLLECTIVE_LIST_TIMING,
+  COLLECTIVE_LIST_SCORING,
+  MATCHING,
+} from '@/config/constants';
 
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -64,9 +69,9 @@ export function startCollectiveListRound(room: GameRoom, io: SocketServer, confi
     turnOrder,
     activePlayers: [...turnOrder],
     eliminatedPlayers: [],
-    pointsPerCorrect: config.pointsPerCorrect ?? 200,
-    timePerTurn: config.timePerTurn ?? 15,
-    fuzzyThreshold: config.fuzzyThreshold ?? 0.85,
+    pointsPerCorrect: config.pointsPerCorrect ?? COLLECTIVE_LIST_SCORING.POINTS_PER_CORRECT,
+    timePerTurn: config.timePerTurn ?? (COLLECTIVE_LIST_TIMING.TURN_DURATION / 1000),
+    fuzzyThreshold: config.fuzzyThreshold ?? MATCHING.FUZZY_THRESHOLD,
     turnNumber: 0,
   };
 
@@ -82,7 +87,7 @@ export function startCollectiveListRound(room: GameRoom, io: SocketServer, confi
       currentRoom.state.bonusRound.phase = 'playing';
       startCollectiveListTurn(currentRoom, io);
     }
-  }, 3000);
+  }, COLLECTIVE_LIST_TIMING.INTRO);
 }
 
 // ============================================
@@ -261,7 +266,7 @@ export function handleCollectiveListAnswer(room: GameRoom, io: SocketServer, pla
       if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
         startCollectiveListTurn(currentRoom, io);
       }
-    }, 1500);
+    }, COLLECTIVE_LIST_TIMING.CORRECT_ANSWER_DELAY);
   } else {
     // Wrong answer - player is eliminated
     bonusRound.lastGuess = {
@@ -403,7 +408,7 @@ export function eliminateCollectiveListPlayer(
     if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
       startCollectiveListTurn(currentRoom, io);
     }
-  }, 2000);
+  }, COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY);
 }
 
 // ============================================
@@ -427,7 +432,9 @@ export function endCollectiveListRound(room: GameRoom, io: SocketServer, reason:
 
   // Award bonus points to winners (remaining active players)
   const winners = bonusRound.activePlayers;
-  const winnerBonus = winners.length === 1 ? 500 : 250;
+  const winnerBonus = winners.length === 1 
+    ? COLLECTIVE_LIST_SCORING.WINNER_BONUS_SOLO 
+    : COLLECTIVE_LIST_SCORING.WINNER_BONUS_MULTI;
   
   winners.forEach((playerId) => {
     const player = room.players.get(playerId);
@@ -518,6 +525,6 @@ export function endCollectiveListRound(room: GameRoom, io: SocketServer, reason:
       const { showScoreboard } = require('./matchFlow');
       showScoreboard(currentRoom, io);
     }
-  }, 8000);
+  }, COLLECTIVE_LIST_TIMING.FINAL_RESULTS);
 }
 

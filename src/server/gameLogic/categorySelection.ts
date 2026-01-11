@@ -28,6 +28,12 @@ import {
   emitPhaseChange,
   broadcastRoomUpdate,
 } from '../roomStore';
+import {
+  GAME_TIMERS,
+  UI_TIMING,
+  RPS_DUEL,
+  DICE_ROYALE,
+} from '@/config/constants';
 import { botManager } from '../botManager';
 import { 
   selectRandomCategoryMode, 
@@ -150,7 +156,7 @@ export function startCategoryVoting(room: GameRoom, io: SocketServer): void {
     if (currentRoom && currentRoom.state.phase === 'category_voting') {
       finalizeCategoryVoting(currentRoom, io);
     }
-  }, 15000);
+  }, GAME_TIMERS.CATEGORY_VOTING);
 }
 
 /**
@@ -231,8 +237,8 @@ export async function finalizeCategoryVoting(room: GameRoom, io: SocketServer): 
           if (!innerRoom) return;
           const { startQuestion } = require('./questions');
           startQuestion(innerRoom, io);
-        }, 2500);
-      }, 3000);
+        }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
+      }, UI_TIMING.ROULETTE_ANIMATION);
     } else {
       io.to(roomCode).emit('category_selected', { 
         categoryId: selectedCategoryId,
@@ -245,7 +251,7 @@ export async function finalizeCategoryVoting(room: GameRoom, io: SocketServer): 
         if (!currentRoom) return;
         const { startQuestion } = require('./questions');
         startQuestion(currentRoom, io);
-      }, 2500);
+      }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
     }
 
   } catch (error) {
@@ -298,7 +304,7 @@ export function startCategoryWheel(room: GameRoom, io: SocketServer): void {
     if (currentRoom && currentRoom.state.phase === 'category_wheel') {
       finalizeWheelSelection(currentRoom, io, selectedCatId);
     }
-  }, 5500);
+  }, UI_TIMING.WHEEL_ANIMATION);
 }
 
 /**
@@ -330,7 +336,7 @@ export async function finalizeWheelSelection(room: GameRoom, io: SocketServer, c
       if (!currentRoom) return;
       const { startQuestion } = require('./questions');
       startQuestion(currentRoom, io);
-    }, 2000);
+    }, UI_TIMING.STANDARD_TRANSITION);
 
   } catch (error) {
     console.error(`❌ Error in finalizeWheelSelection for room ${room.code}:`, error);
@@ -373,7 +379,7 @@ export function startLosersPick(room: GameRoom, io: SocketServer): void {
       ];
       finalizeLosersPick(currentRoom, io, randomCat.id);
     }
-  }, 15000);
+  }, GAME_TIMERS.CATEGORY_VOTING);
 }
 
 /**
@@ -405,7 +411,7 @@ export async function finalizeLosersPick(room: GameRoom, io: SocketServer, categ
       if (!currentRoom) return;
       const { startQuestion } = require('./questions');
       startQuestion(currentRoom, io);
-    }, 2500);
+    }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
 
   } catch (error) {
     console.error(`❌ Error in finalizeLosersPick for room ${room.code}:`, error);
@@ -466,7 +472,7 @@ export function startDiceRoyale(room: GameRoom, io: SocketServer): void {
       })),
     });
     io.to(roomCode).emit('dice_royale_ready');
-  }, 500);
+  }, UI_TIMING.SHORT_DELAY);
 
   // Timeout - auto-roll for players who haven't rolled
   setTimeout(() => {
@@ -474,7 +480,7 @@ export function startDiceRoyale(room: GameRoom, io: SocketServer): void {
     if (currentRoom && currentRoom.state.phase === 'category_dice_royale' && currentRoom.state.diceRoyale?.phase === 'rolling') {
       autoRollRemainingPlayers(currentRoom, io);
     }
-  }, 15500);
+  }, GAME_TIMERS.DICE_ROYALE_ROLLING);
 }
 
 /**
@@ -501,7 +507,7 @@ export function autoRollRemainingPlayers(room: GameRoom, io: SocketServer): void
     if (currentRoom) {
       checkDiceRoyaleResult(currentRoom, io);
     }
-  }, 500);
+  }, UI_TIMING.SHORT_DELAY);
 }
 
 /**
@@ -566,8 +572,8 @@ export function checkDiceRoyaleResult(room: GameRoom, io: SocketServer): void {
         if (innerRoom && innerRoom.state.phase === 'category_dice_royale' && innerRoom.state.diceRoyale?.phase === 'rolling') {
           autoRollRemainingPlayers(innerRoom, io);
         }
-      }, 10000);
-    }, 2500);
+      }, GAME_TIMERS.RPS_ROUND);
+    }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
     return;
   }
 
@@ -605,7 +611,7 @@ export function checkDiceRoyaleResult(room: GameRoom, io: SocketServer): void {
     if (currentRoom && currentRoom.state.phase === 'category_dice_royale') {
       startDiceRoyalePick(currentRoom, io);
     }
-  }, 3000);
+  }, UI_TIMING.ROULETTE_ANIMATION);
 }
 
 /**
@@ -626,7 +632,7 @@ export function startDiceRoyalePick(room: GameRoom, io: SocketServer): void {
       ];
       finalizeDiceRoyalePick(currentRoom, io, randomCat.id);
     }
-  }, 15000);
+  }, GAME_TIMERS.CATEGORY_VOTING);
 }
 
 /**
@@ -662,7 +668,7 @@ export async function finalizeDiceRoyalePick(room: GameRoom, io: SocketServer, c
     if (!currentRoom) return;
     const { startQuestion } = require('./questions');
     startQuestion(currentRoom, io);
-  }, 2500);
+  }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
 }
 
 /**
@@ -708,7 +714,7 @@ export function handleDiceRoyaleRoll(room: GameRoom, io: SocketServer, playerId:
       if (currentRoom) {
         checkDiceRoyaleResult(currentRoom, io);
       }
-    }, 1500);
+    }, UI_TIMING.MEDIUM_DELAY);
   }
 }
 
@@ -760,7 +766,7 @@ export function startRPSDuel(room: GameRoom, io: SocketServer): void {
       player1: { id: player1.id, name: player1.name, avatarSeed: player1.avatarSeed },
       player2: { id: player2.id, name: player2.name, avatarSeed: player2.avatarSeed },
     });
-  }, 500);
+  }, UI_TIMING.SHORT_DELAY);
 
   // Start first round after intro
   setTimeout(() => {
@@ -769,7 +775,7 @@ export function startRPSDuel(room: GameRoom, io: SocketServer): void {
       currentRoom.state.rpsDuel.phase = 'choosing';
       startRPSRound(currentRoom, io);
     }
-  }, 3000);
+  }, UI_TIMING.ROULETTE_ANIMATION);
 }
 
 /**
@@ -808,7 +814,7 @@ export function startRPSRound(room: GameRoom, io: SocketServer): void {
       io.to(roomCode).emit('rps_choice_made', { playerId: currentDuel.player2Id });
     }
     resolveRPSRound(currentRoom, io);
-  }, 10000);
+  }, GAME_TIMERS.RPS_ROUND);
 }
 
 /**
@@ -867,7 +873,7 @@ export function resolveRPSRound(room: GameRoom, io: SocketServer): void {
       if (!currentRoom || currentRoom.state.phase !== 'category_rps_duel') return;
       const winnerId = p1Wins >= 2 ? player1Id : player2Id;
       finalizeRPSDuelWinner(currentRoom, io, winnerId);
-    }, 2500);
+    }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
   } else if (capturedRound >= 3) {
     // After 3 rounds, whoever leads wins
     setTimeout(() => {
@@ -889,7 +895,7 @@ export function resolveRPSRound(room: GameRoom, io: SocketServer): void {
         return;
       }
       finalizeRPSDuelWinner(currentRoom, io, winnerId);
-    }, 2500);
+    }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
   } else {
     // Start next round
     setTimeout(() => {
@@ -900,7 +906,7 @@ export function resolveRPSRound(room: GameRoom, io: SocketServer): void {
       currentDuel.currentRound++;
       currentDuel.phase = 'choosing';
       startRPSRound(currentRoom, io);
-    }, 2500);
+    }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
   }
 }
 
@@ -938,7 +944,7 @@ function finalizeRPSDuelWinner(room: GameRoom, io: SocketServer, winnerId: strin
     if (currentRoom && currentRoom.state.phase === 'category_rps_duel') {
       startRPSDuelPick(currentRoom, io);
     }
-  }, 3000);
+  }, UI_TIMING.ROULETTE_ANIMATION);
 }
 
 /**
@@ -959,7 +965,7 @@ export function startRPSDuelPick(room: GameRoom, io: SocketServer): void {
       ];
       finalizeRPSDuelPick(currentRoom, io, randomCat.id);
     }
-  }, 15000);
+  }, GAME_TIMERS.CATEGORY_VOTING);
 }
 
 /**
@@ -995,7 +1001,7 @@ export async function finalizeRPSDuelPick(room: GameRoom, io: SocketServer, cate
     if (!currentRoom) return;
     const { startQuestion } = require('./questions');
     startQuestion(currentRoom, io);
-  }, 2500);
+  }, UI_TIMING.CATEGORY_ANNOUNCEMENT);
 }
 
 /**

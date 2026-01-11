@@ -21,6 +21,13 @@ import {
 } from '../roomStore';
 import { botManager } from '../botManager';
 import { checkAnswer as fuzzyCheckAnswer } from '@/lib/fuzzyMatch';
+import {
+  HOT_BUTTON_TIMING,
+  HOT_BUTTON_LIMITS,
+  HOT_BUTTON_SCORING,
+  MATCHING,
+  calculateHotButtonSpeedBonus,
+} from '@/config/constants';
 
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -67,16 +74,16 @@ export function startHotButtonRound(room: GameRoom, io: SocketServer, config: Bo
 
     buzzedPlayerId: null,
     buzzerTimeout: null,
-    buzzerTimeoutDuration: config.buzzerTimeout || 25, // Default: 25 seconds
+    buzzerTimeoutDuration: config.buzzerTimeout || (HOT_BUTTON_TIMING.BUZZER_TIMEOUT / 1000), // Default: 25 seconds
     originalBuzzerTimerEnd: null,
     buzzOrder: [],
     buzzTimestamps: new Map(),
 
     answerTimer: null,
-    answerTimeoutDuration: config.answerTimeout || 15,
+    answerTimeoutDuration: config.answerTimeout || (HOT_BUTTON_TIMING.ANSWER_TIMEOUT / 1000), // Default: 15 seconds
 
     attemptedPlayerIds: new Set(),
-    maxRebuzzAttempts: config.maxRebuzzAttempts || 2,
+    maxRebuzzAttempts: config.maxRebuzzAttempts || HOT_BUTTON_LIMITS.MAX_REBUZZ_ATTEMPTS,
     allowRebuzz: config.allowRebuzz ?? true,
 
     playerScores: new Map(),
@@ -84,7 +91,7 @@ export function startHotButtonRound(room: GameRoom, io: SocketServer, config: Bo
     // Question History for tracking all answered questions
     questionHistory: [],
 
-    fuzzyThreshold: config.fuzzyThreshold || 0.85,
+    fuzzyThreshold: config.fuzzyThreshold || MATCHING.FUZZY_THRESHOLD,
   };
 
   room.state.phase = 'bonus_round';
@@ -92,7 +99,7 @@ export function startHotButtonRound(room: GameRoom, io: SocketServer, config: Bo
   broadcastRoomUpdate(room, io);
 
   console.log(`⚡ Hot Button Round started: ${topic}`);
-  console.log(`   ${questions.length} questions, ${config.buzzerTimeout || 25}s buzzer timeout`);
+  console.log(`   ${questions.length} questions, ${config.buzzerTimeout || (HOT_BUTTON_TIMING.BUZZER_TIMEOUT / 1000)}s buzzer timeout`);
 
   // After intro, start first question (longer delay so players can read rules)
   setTimeout(() => {
@@ -101,7 +108,7 @@ export function startHotButtonRound(room: GameRoom, io: SocketServer, config: Bo
     if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'hot_button' && currentRoom.state.bonusRound.phase === 'intro') {
       startNextQuestion(currentRoom, io);
     }
-  }, 6000); // 6 seconds to read the intro
+  }, HOT_BUTTON_TIMING.INTRO);
 }
 
 // ============================================
@@ -193,7 +200,7 @@ function startQuestionReveal(room: GameRoom, io: SocketServer, question: any, pr
     hotButton.buzzerTimeout = null;
   }
 
-  const revealSpeed = question.revealSpeed || 50; // ms per character
+  const revealSpeed = question.revealSpeed || HOT_BUTTON_TIMING.REVEAL_SPEED;
   const roomCode = room.code;
   const questionIndex = hotButton.currentQuestionIndex; // Store for validation
 
@@ -381,22 +388,14 @@ export function handleHotButtonAnswer(room: GameRoom, io: SocketServer, playerId
   if (result.isMatch) {
     // CORRECT!
 
-    // Calculate speed bonus (0-500 points based on how quickly they buzzed)
+    // Calculate speed bonus using constants
     const buzzTime = hotButton.buzzTimestamps.get(playerId) || Date.now();
     const buzzTimeMs = buzzTime - hotButton.questionStartTime;
     const questionText = currentQuestion.text;
     const revealedPercent = hotButton.revealedChars / questionText.length;
 
-    // Earlier buzz = more bonus
-    // 0-25% revealed: +500 bonus
-    // 25-50%: +300 bonus
-    // 50-75%: +150 bonus
-    // 75-100%: +50 bonus
-    let speedBonus = 0;
-    if (revealedPercent <= 0.25) speedBonus = 500;
-    else if (revealedPercent <= 0.50) speedBonus = 300;
-    else if (revealedPercent <= 0.75) speedBonus = 150;
-    else speedBonus = 50;
+    // Calculate speed bonus based on revealed percentage
+    const speedBonus = calculateHotButtonSpeedBonus(revealedPercent);
 
     const basePoints = currentQuestion.pointsCorrect;
     const totalPoints = basePoints + speedBonus;
@@ -468,15 +467,15 @@ export function handleHotButtonAnswer(room: GameRoom, io: SocketServer, playerId
         hb.currentQuestionIndex++;
         startNextQuestion(currentRoom, io);
       }
-    }, 4000); // Increased delay to show result longer
+    }, HOT_BUTTON_TIMING.RESULT_DISPLAY);
 
 
   } else {
     // WRONG!
     const buzzTime = hotButton.buzzTimestamps.get(playerId) || Date.now();
     const buzzTimeMs = buzzTime - hotButton.questionStartTime;
-    const points = currentQuestion.pointsWrong;
-    player.score += points; // Add negative points (-500)
+    const points = currentQuestion.pointsWrong || HOT_BUTTON_SCORING.WRONG_PENALTY;
+    player.score += points; // Add negative points
 
     const currentScore = hotButton.playerScores.get(playerId) || 0;
     hotButton.playerScores.set(playerId, currentScore + points);
@@ -559,7 +558,7 @@ export function handleHotButtonAnswer(room: GameRoom, io: SocketServer, playerId
         if (dev) {
           botManager.onHotButtonRebuzz(roomCode);
         }
-      }, 2500);
+      }, HOT_BUTTON_TIMING.REBUZZ_DELAY);
     } else {
       // No more attempts - add to history as wrong (last person who tried)
       const historyEntry: HotButtonQuestionResult = {
@@ -596,7 +595,7 @@ export function handleHotButtonAnswer(room: GameRoom, io: SocketServer, playerId
           hb.currentQuestionIndex++;
           startNextQuestion(currentRoom, io);
         }
-      }, 4000); // Show correct answer before moving on
+      }, HOT_BUTTON_TIMING.RESULT_DISPLAY);
     }
 
 
@@ -689,7 +688,7 @@ function handleBuzzerTimeout(room: GameRoom, io: SocketServer): void {
 
   broadcastRoomUpdate(room, io);
 
-  // Move to next question
+    // Move to next question
   const roomCode = room.code;
   const questionIndex = hotButton.currentQuestionIndex;
   
@@ -704,7 +703,7 @@ function handleBuzzerTimeout(room: GameRoom, io: SocketServer): void {
       hb.currentQuestionIndex++;
       startNextQuestion(currentRoom, io);
     }
-  }, 4000); // Increased to show answer
+  }, HOT_BUTTON_TIMING.RESULT_DISPLAY);
 }
 
 /**
@@ -771,7 +770,7 @@ function handleAnswerTimeout(room: GameRoom, io: SocketServer, playerId: string)
       if (dev) {
         botManager.onHotButtonRebuzz(roomCode);
       }
-    }, 2000);
+    }, HOT_BUTTON_TIMING.TIMEOUT_REBUZZ_DELAY);
   } else {
     console.log(`   No rebuzz possible after timeout, moving to next question`);
     const roomCode = room.code;
@@ -788,7 +787,7 @@ function handleAnswerTimeout(room: GameRoom, io: SocketServer, playerId: string)
         hb.currentQuestionIndex++;
         startNextQuestion(currentRoom, io);
       }
-    }, 2500);
+    }, HOT_BUTTON_TIMING.REBUZZ_DELAY);
   }
 }
 
@@ -869,6 +868,6 @@ function endHotButtonRound(room: GameRoom, io: SocketServer): void {
       const { showScoreboard } = require('./matchFlow');
       showScoreboard(currentRoom, io);
     }
-  }, 8000);
+  }, HOT_BUTTON_TIMING.FINAL_RESULTS);
 }
 
