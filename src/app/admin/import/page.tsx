@@ -59,11 +59,38 @@ interface ImportLog {
 
 const BATCH_SIZE_OPTIONS = [10, 25, 50, 100];
 
+type ImportMode = 'opentdb' | 'hotbutton';
+
 export default function ImportPage() {
+  // Mode State
+  const [importMode, setImportMode] = useState<ImportMode>('opentdb');
+  
   // File & Questions State
   const [file, setFile] = useState<File | null>(null);
   const [questions, setQuestions] = useState<OpenTDBQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Hot Button Import State
+  const [hotButtonJson, setHotButtonJson] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [parsedQuestions, setParsedQuestions] = useState<Array<{
+    text: string;
+    correctAnswer: string;
+    acceptedAnswers?: string[];
+    difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+    category?: string;
+    matchedCategoryId?: string;
+    matchedCategoryName?: string;
+    selected: boolean;
+  }>>([]);
+  const [isImportingHotButton, setIsImportingHotButton] = useState(false);
+  const [hotButtonResult, setHotButtonResult] = useState<{
+    success: boolean;
+    message: string;
+    added?: number;
+    failed?: number;
+    errors?: string[];
+  } | null>(null);
   
   // Pagination & Selection
   const [currentPage, setCurrentPage] = useState(0);
@@ -509,6 +536,167 @@ export default function ImportPage() {
   const selectedOnPageCount = currentQuestions.filter((_, i) => selectedIndices.has(startIndex + i)).length;
   const duplicatesOnPageCount = currentQuestions.filter(q => q._duplicate).length;
 
+  // Process JSON and match categories
+  const handleProcessJson = () => {
+    if (!hotButtonJson.trim()) {
+      setError('Bitte JSON-Daten eingeben');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+    setParsedQuestions([]);
+
+    try {
+      const data = JSON.parse(hotButtonJson);
+      
+      if (!data.questions || !Array.isArray(data.questions)) {
+        throw new Error('JSON muss ein "questions" Array enthalten');
+      }
+
+      // Create category lookup maps
+      const categoryBySlug = new Map(categories.map(c => [c.slug.toLowerCase(), c]));
+      const categoryByName = new Map(categories.map(c => [c.name.toLowerCase(), c]));
+
+      // Process each question
+      const processed = data.questions.map((q: any, idx: number) => {
+        let matchedCategoryId: string | undefined;
+        let matchedCategoryName: string | undefined;
+
+        // Try to match category
+        if (q.category) {
+          const categoryLower = q.category.toLowerCase();
+          const matched = categoryBySlug.get(categoryLower) || categoryByName.get(categoryLower);
+          
+          if (matched) {
+            matchedCategoryId = matched.id;
+            matchedCategoryName = `${matched.icon} ${matched.name}`;
+          }
+        }
+
+        return {
+          text: q.text || '',
+          correctAnswer: q.correctAnswer || '',
+          acceptedAnswers: q.acceptedAnswers,
+          difficulty: q.difficulty || 'MEDIUM',
+          category: q.category,
+          matchedCategoryId,
+          matchedCategoryName,
+          selected: true, // All selected by default
+        };
+      });
+
+      setParsedQuestions(processed);
+    } catch (e) {
+      setError('JSON-Fehler: ' + (e instanceof Error ? e.message : 'Ungültiges Format'));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Toggle question selection
+  const toggleQuestionSelection = (index: number) => {
+    setParsedQuestions(prev => prev.map((q, i) => 
+      i === index ? { ...q, selected: !q.selected } : q
+    ));
+  };
+
+  // Update question category
+  const updateQuestionCategory = (index: number, categoryId: string) => {
+    setParsedQuestions(prev => prev.map((q, i) => {
+      if (i === index) {
+        const cat = categories.find(c => c.id === categoryId);
+        return {
+          ...q,
+          matchedCategoryId: categoryId,
+          matchedCategoryName: cat ? `${cat.icon} ${cat.name}` : undefined,
+        };
+      }
+      return q;
+    }));
+  };
+
+  // Select/Deselect all
+  const selectAllQuestions = () => {
+    setParsedQuestions(prev => prev.map(q => ({ ...q, selected: true })));
+  };
+
+  const deselectAllQuestions = () => {
+    setParsedQuestions(prev => prev.map(q => ({ ...q, selected: false })));
+  };
+
+  // Import selected questions
+  const handleHotButtonImport = async () => {
+    const selectedQuestions = parsedQuestions.filter(q => q.selected);
+    
+    if (selectedQuestions.length === 0) {
+      setError('Keine Fragen ausgewählt');
+      return;
+    }
+
+    // Check if all selected questions have a category
+    const missingCategory = selectedQuestions.some(q => !q.matchedCategoryId);
+    if (missingCategory) {
+      setError('Alle ausgewählten Fragen müssen eine Kategorie haben');
+      return;
+    }
+
+    setIsImportingHotButton(true);
+    setError(null);
+    setHotButtonResult(null);
+
+    try {
+      // Transform to API format with explicit categoryId
+      const questionsToImport = selectedQuestions.map(q => ({
+        text: q.text,
+        correctAnswer: q.correctAnswer,
+        acceptedAnswers: q.acceptedAnswers,
+        difficulty: q.difficulty,
+        categoryId: q.matchedCategoryId!, // We checked this above
+      }));
+
+      const response = await fetch('/api/admin/import-hotbutton', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questions: questionsToImport,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Import fehlgeschlagen');
+      }
+
+      setHotButtonResult({
+        success: true,
+        message: result.message,
+        added: result.added,
+        failed: result.failed,
+        errors: result.errors,
+      });
+      
+      // Clear on success
+      if (result.added > 0) {
+        setHotButtonJson('');
+        setParsedQuestions([]);
+      }
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unbekannter Fehler';
+      setHotButtonResult({
+        success: false,
+        message: errorMsg,
+      });
+    } finally {
+      setIsImportingHotButton(false);
+    }
+  };
+
+  // Count selected questions with valid categories
+  const selectedQuestionsCount = parsedQuestions.filter(q => q.selected).length;
+  const validQuestionsCount = parsedQuestions.filter(q => q.selected && q.matchedCategoryId).length;
+
   return (
     <div className="p-8 space-y-8">
       {/* Header */}
@@ -529,6 +717,31 @@ export default function ImportPage() {
         >
           <Key className="w-4 h-4" />
           {apiKey ? 'API Key gesetzt' : 'API Key eingeben'}
+        </button>
+      </div>
+
+      {/* Mode Selector */}
+      <div className="flex items-center gap-2 bg-card border border-border rounded-xl p-1">
+        <button
+          onClick={() => setImportMode('opentdb')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+            importMode === 'opentdb'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <FileJson className="w-4 h-4 inline-block mr-2" />
+          OpenTDB Import
+        </button>
+        <button
+          onClick={() => setImportMode('hotbutton')}
+          className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+            importMode === 'hotbutton'
+              ? 'bg-amber-600 text-white'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          ⚡ Hot Button Import
         </button>
       </div>
 
@@ -568,6 +781,306 @@ export default function ImportPage() {
           </button>
         </div>
       )}
+
+      {/* HOT BUTTON IMPORT MODE */}
+      {importMode === 'hotbutton' && (
+        <>
+          {/* Info Banner */}
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+            <Info className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-500">⚡ Hot Button Massen-Import</p>
+              <p className="text-sm text-amber-400/80 mt-1">
+                Importiere mehrere Hot Button Fragen auf einmal via JSON. Kategorien werden automatisch zugeordnet (Slug oder Name).
+              </p>
+            </div>
+          </div>
+
+          {/* Hot Button Result */}
+          {hotButtonResult && (
+            <div className={`${hotButtonResult.success ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'} border rounded-xl p-4`}>
+              <div className="flex items-start gap-3">
+                {hotButtonResult.success ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                  <p className={`font-medium ${hotButtonResult.success ? 'text-green-500' : 'text-red-500'}`}>
+                    {hotButtonResult.success ? 'Import erfolgreich' : 'Import fehlgeschlagen'}
+                  </p>
+                  <p className={`text-sm ${hotButtonResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                    {hotButtonResult.message}
+                  </p>
+                  {hotButtonResult.errors && hotButtonResult.errors.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm font-medium text-red-400">Fehler:</p>
+                      <ul className="text-xs text-red-400/80 space-y-0.5 list-disc list-inside">
+                        {hotButtonResult.errors.map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => setHotButtonResult(null)} className="ml-auto">
+                  <X className={`w-4 h-4 ${hotButtonResult.success ? 'text-green-400 hover:text-green-300' : 'text-red-400 hover:text-red-300'}`} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* JSON Input */}
+          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">JSON-Daten</h3>
+              <button
+                onClick={() => {
+                  const example = {
+                    questions: [
+                      {
+                        text: "Welcher Schauspieler spielte Jack Dawson in Titanic?",
+                        correctAnswer: "Leonardo DiCaprio",
+                        acceptedAnswers: ["DiCaprio", "Leo DiCaprio"],
+                        difficulty: "MEDIUM",
+                        category: "filme_serien"
+                      },
+                      {
+                        text: "In welchem Jahr fiel die Berliner Mauer?",
+                        correctAnswer: "1989",
+                        acceptedAnswers: ["neunzehnhundertneunundachtzig"],
+                        difficulty: "EASY"
+                      }
+                    ]
+                  };
+                  setHotButtonJson(JSON.stringify(example, null, 2));
+                }}
+                className="text-sm text-primary hover:underline"
+              >
+                Beispiel laden
+              </button>
+            </div>
+            
+            <textarea
+              value={hotButtonJson}
+              onChange={(e) => setHotButtonJson(e.target.value)}
+              placeholder={`{\n  "questions": [\n    {\n      "text": "Deine Frage hier?",\n      "correctAnswer": "Die Antwort",\n      "acceptedAnswers": ["Variante 1", "Variante 2"],\n      "difficulty": "MEDIUM",\n      "category": "kategorie_slug"\n    }\n  ]\n}`}
+              className="w-full bg-muted border border-border rounded-lg px-4 py-3 min-h-[400px] resize-y font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            
+            <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-2">
+              <p className="font-medium">📋 Schema:</p>
+              <ul className="text-muted-foreground space-y-1 text-xs">
+                <li><code className="bg-background px-1 py-0.5 rounded">text</code> (Pflicht): Die Frage</li>
+                <li><code className="bg-background px-1 py-0.5 rounded">correctAnswer</code> (Pflicht): Richtige Antwort</li>
+                <li><code className="bg-background px-1 py-0.5 rounded">acceptedAnswers</code> (Optional): Array mit Varianten</li>
+                <li><code className="bg-background px-1 py-0.5 rounded">difficulty</code> (Optional): EASY | MEDIUM | HARD (default: MEDIUM)</li>
+                <li><code className="bg-background px-1 py-0.5 rounded">category</code> (Optional): Kategorie-Slug für Auto-Matching</li>
+              </ul>
+            </div>
+
+            {/* Available Categories */}
+            <div className="bg-primary/10 border border-primary/30 rounded-lg p-3 text-sm space-y-2">
+              <p className="font-medium text-primary">🏷️ Verfügbare Kategorien:</p>
+              <div className="flex flex-wrap gap-2">
+                {categories.map(cat => (
+                  <code key={cat.id} className="bg-background px-2 py-1 rounded text-xs">
+                    {cat.icon} {cat.slug}
+                  </code>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Verwende diese Slugs im <code className="bg-background px-1 rounded">category</code> Feld für automatische Zuordnung
+              </p>
+            </div>
+          </div>
+
+          {/* Process Button */}
+          <div className="flex justify-center">
+            <button
+              onClick={handleProcessJson}
+              disabled={isProcessing || !hotButtonJson.trim()}
+              className="flex items-center gap-2 px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-lg font-medium"
+            >
+              {isProcessing ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
+              JSON verarbeiten & Vorschau anzeigen
+            </button>
+          </div>
+
+          {/* Parsed Questions Preview */}
+          {parsedQuestions.length > 0 && (
+            <>
+              {/* Controls Bar */}
+              <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">
+                    {parsedQuestions.length} Fragen verarbeitet
+                  </span>
+                  <span className="text-primary">•</span>
+                  <span className="text-sm text-primary">
+                    {selectedQuestionsCount} ausgewählt
+                  </span>
+                  <span className="text-primary">•</span>
+                  <span className={`text-sm ${validQuestionsCount === selectedQuestionsCount ? 'text-green-400' : 'text-yellow-500'}`}>
+                    {validQuestionsCount} mit Kategorie
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={selectAllQuestions}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Alle auswählen
+                  </button>
+                  <span className="text-muted-foreground">|</span>
+                  <button
+                    onClick={deselectAllQuestions}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Keine
+                  </button>
+                </div>
+              </div>
+
+              {/* Questions List */}
+              <div className="space-y-3">
+                {parsedQuestions.map((q, index) => (
+                  <div
+                    key={index}
+                    className={`bg-card border rounded-xl p-4 transition-all ${
+                      q.selected 
+                        ? 'border-amber-500 ring-1 ring-amber-500/30' 
+                        : 'border-border opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Checkbox */}
+                      <div
+                        onClick={() => toggleQuestionSelection(index)}
+                        className="cursor-pointer"
+                      >
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          q.selected 
+                            ? 'bg-amber-600 border-amber-600' 
+                            : 'border-muted-foreground/50'
+                        }`}>
+                          {q.selected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 space-y-3">
+                        {/* Header */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs ${
+                              q.difficulty === 'EASY' ? 'bg-green-500/20 text-green-400' :
+                              q.difficulty === 'HARD' ? 'bg-red-500/20 text-red-400' :
+                              'bg-yellow-500/20 text-yellow-400'
+                            }`}
+                          >
+                            {q.difficulty === 'EASY' ? '🟢 Leicht' : q.difficulty === 'HARD' ? '🔴 Schwer' : '🟡 Mittel'}
+                          </Badge>
+                          {q.category && (
+                            <Badge variant="secondary" className="text-xs">
+                              Slug: {q.category}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Question Text */}
+                        <p className="font-medium">{q.text}</p>
+                        
+                        {/* Answer */}
+                        <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span className="text-green-400 text-sm">{q.correctAnswer}</span>
+                        </div>
+                        
+                        {/* Accepted Answers */}
+                        {q.acceptedAnswers && q.acceptedAnswers.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            <span className="font-medium">Varianten:</span> {q.acceptedAnswers.join(', ')}
+                          </div>
+                        )}
+                        
+                        {/* Category Selection */}
+                        <div className="flex items-center gap-3">
+                          <label className="text-sm text-muted-foreground">Kategorie:</label>
+                          <select
+                            value={q.matchedCategoryId || ''}
+                            onChange={(e) => updateQuestionCategory(index, e.target.value)}
+                            className={`flex-1 bg-muted rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                              q.matchedCategoryId 
+                                ? 'focus:ring-amber-500 border-0' 
+                                : 'focus:ring-red-500 border-2 border-red-500/50'
+                            }`}
+                          >
+                            <option value="">Kategorie wählen...</option>
+                            {categories.map(cat => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.icon} {cat.name}
+                              </option>
+                            ))}
+                          </select>
+                          {!q.matchedCategoryId && (
+                            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Import Button */}
+              <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Database className="w-5 h-5 text-amber-500" />
+                      Bereit zum Importieren
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {validQuestionsCount === selectedQuestionsCount 
+                        ? `${selectedQuestionsCount} Fragen können importiert werden`
+                        : `⚠️ ${selectedQuestionsCount - validQuestionsCount} Fragen ohne Kategorie`
+                      }
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={handleHotButtonImport}
+                    disabled={isImportingHotButton || selectedQuestionsCount === 0 || validQuestionsCount !== selectedQuestionsCount}
+                    className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    {isImportingHotButton ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        ⚡
+                        <Import className="w-5 h-5" />
+                      </>
+                    )}
+                    {selectedQuestionsCount} Fragen importieren
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* OPENTDB IMPORT MODE */}
+      {importMode === 'opentdb' && (
+        <>
 
       {/* Import Result */}
       {importResult && (
@@ -1056,6 +1569,8 @@ export default function ImportPage() {
             </div>
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   );

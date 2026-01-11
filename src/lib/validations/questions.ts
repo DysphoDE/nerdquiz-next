@@ -278,5 +278,27 @@ export const CreateCategorySchema = z.object({
 export type CreateQuestionInput = z.infer<typeof CreateQuestionSchema>;
 export type CreateCategoryInput = z.infer<typeof CreateCategorySchema>;
 
+// ============================================
+// HOT BUTTON IMPORT SCHEMA
+// ============================================
+
+/**
+ * Schema für Hot Button Massen-Import via JSON
+ */
+export const HotButtonImportQuestionSchema = z.object({
+  text: z.string().min(5, 'Frage muss mindestens 5 Zeichen haben'),
+  correctAnswer: z.string().min(1, 'Richtige Antwort erforderlich'),
+  acceptedAnswers: z.array(z.string().min(1)).optional(),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional().default('MEDIUM'),
+  category: z.string().optional(), // Category slug for auto-matching (legacy)
+  categoryId: z.string().optional(), // Direct category ID (preferred)
+});
+
+export const HotButtonImportSchema = z.object({
+  questions: z.array(HotButtonImportQuestionSchema).min(1, 'Mindestens eine Frage erforderlich'),
+});
+
+export type HotButtonImportQuestion = z.infer<typeof HotButtonImportQuestionSchema>;
+export type HotButtonImportData = z.infer<typeof HotButtonImportSchema>;
 
 
