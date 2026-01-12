@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Clock, Send, Trophy, Check, X, History } from 'lucide-react';
+import { Zap, Clock, Send, Trophy, Check, X, History, Crown } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
-import { getSocket } from '@/lib/socket';
 import { useGameStore, usePlayers } from '@/store/gameStore';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -354,15 +353,16 @@ function NoBuzzResultOverlay({ correctAnswer, questionText }: { correctAnswer: s
 
 export function HotButtonGame() {
   const { buzzHotButton, submitHotButtonAnswer } = useSocket();
-  const { room, playerId } = useGameStore();
+  const { room, playerId, hotButtonBuzz, hotButtonEndResult } = useGameStore();
   const players = usePlayers();
 
   const [inputValue, setInputValue] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
-  const [showBuzzerOverlay, setShowBuzzerOverlay] = useState(false);
-  const [buzzerData, setBuzzerData] = useState<{ playerName: string; avatarSeed: string; buzzTimeMs: number; revealedPercent: number } | null>(null);
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Derive overlay visibility from store state
+  const showBuzzerOverlay = hotButtonBuzz !== null;
 
   const hotButton = room?.bonusRound as HotButtonBonusRound | null;
   const isBuzzed = hotButton?.buzzedPlayerId === playerId;
@@ -374,6 +374,12 @@ export function HotButtonGame() {
 
   const hasAttempted = hotButton?.attemptedPlayerIds.includes(playerId || '') ?? false;
   const canBuzz = isRevealing && !hasAttempted && !hotButton?.buzzedPlayerId;
+
+  // Buzz handler (memoized for dependency array)
+  const handleBuzz = useCallback(() => {
+    if (!canBuzz) return;
+    buzzHotButton();
+  }, [canBuzz, buzzHotButton]);
 
   // Keyboard shortcut - Space to buzz
   useEffect(() => {
@@ -389,39 +395,10 @@ export function HotButtonGame() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canBuzz]);
+  }, [canBuzz, handleBuzz]);
 
-  // Listen to hot_button_buzz event for accurate buzz data
-  useEffect(() => {
-    const socket = getSocket();
-
-    const handleBuzzEvent = (data: {
-      playerId: string;
-      playerName: string;
-      avatarSeed: string;
-      buzzTimeMs: number;
-      revealedPercent: number;
-      timerEnd: number;
-    }) => {
-      console.log('🔔 Buzz event received:', data);
-      setBuzzerData({
-        playerName: data.playerName,
-        avatarSeed: data.avatarSeed,
-        buzzTimeMs: data.buzzTimeMs,
-        revealedPercent: data.revealedPercent,
-      });
-      setShowBuzzerOverlay(true);
-
-      // Hide overlay after 2 seconds
-      setTimeout(() => setShowBuzzerOverlay(false), 2000);
-    };
-
-    socket.on('hot_button_buzz', handleBuzzEvent);
-
-    return () => {
-      socket.off('hot_button_buzz', handleBuzzEvent);
-    };
-  }, []);
+  // Hot Button events are now handled centrally in useSocket hook
+  // We read hotButtonBuzz and hotButtonEndResult from the store
 
   // Timer
   useEffect(() => {
@@ -452,11 +429,6 @@ export function HotButtonGame() {
     }
   }, [isBuzzed, isAnswering, showBuzzerOverlay]);
 
-  const handleBuzz = useCallback(() => {
-    if (!canBuzz) return;
-    buzzHotButton();
-  }, [canBuzz, buzzHotButton]);
-
   const handleSubmit = useCallback(() => {
     if (!inputValue.trim() || !isBuzzed) return;
     submitHotButtonAnswer(inputValue.trim());
@@ -482,8 +454,8 @@ export function HotButtonGame() {
     >
       {/* Buzzer Overlay */}
       <AnimatePresence>
-        {showBuzzerOverlay && buzzerData && (
-          <BuzzerOverlay {...buzzerData} />
+        {showBuzzerOverlay && hotButtonBuzz && (
+          <BuzzerOverlay {...hotButtonBuzz} />
         )}
       </AnimatePresence>
 
@@ -757,24 +729,99 @@ export function HotButtonGame() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex-1 flex items-center justify-center"
+              className="mt-6 space-y-4"
             >
-              <Card className="glass p-8 max-w-2xl w-full text-center">
-                <Trophy className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                <h3 className="text-3xl font-bold mb-4">Hot Button beendet!</h3>
-                <p className="text-muted-foreground mb-6">
+              {/* Header Card */}
+              <Card className="glass p-6 text-center border-amber-500/20">
+                <div className="inline-flex items-center justify-center p-3 rounded-full bg-amber-500/10 mb-4">
+                  <Trophy className="w-8 h-8 text-amber-500" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Hot Button beendet!</h3>
+                <p className="text-muted-foreground">
                   {hotButton.totalQuestions} Fragen gespielt
                 </p>
-
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-2">Ergebnisse werden ausgewertet...</p>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full mx-auto"
-                  />
-                </div>
               </Card>
+
+              {/* Score Breakdown */}
+              {hotButtonEndResult && hotButtonEndResult.playerScoreBreakdown.length > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <Card className="glass overflow-hidden">
+                    <div className="p-3 bg-muted/30 border-b border-white/5 flex justify-between items-center">
+                      <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                        Ergebnisse dieser Runde
+                      </h4>
+                    </div>
+                    <div className="divide-y divide-white/5">
+                      {hotButtonEndResult.playerScoreBreakdown.map((score, index) => {
+                        const isMe = score.playerId === playerId;
+                        const isWinner = score.rank === 1;
+                        
+                        return (
+                          <motion.div 
+                            key={score.playerId}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 + index * 0.05 }}
+                            className={cn(
+                              'flex items-center gap-3 p-3 sm:p-4 hover:bg-white/5 transition-colors',
+                              isWinner && 'bg-amber-500/5'
+                            )}
+                          >
+                            {/* Rank */}
+                            <div className={cn(
+                              'w-8 h-8 flex items-center justify-center font-bold rounded-full shrink-0 text-sm',
+                              isWinner ? 'bg-amber-500 text-black' : 'bg-muted text-muted-foreground'
+                            )}>
+                              {isWinner ? <Crown className="w-4 h-4" /> : score.rank}
+                            </div>
+
+                            {/* Player */}
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <GameAvatar 
+                                seed={score.avatarSeed} 
+                                mood={isWinner ? 'superHappy' : score.totalPoints > 0 ? 'happy' : 'sad'} 
+                                size="sm" 
+                              />
+                              <span className={cn(
+                                "font-bold truncate text-sm sm:text-base", 
+                                isMe && "text-primary"
+                              )}>
+                                {score.playerName}
+                                {isMe && <span className="text-xs text-muted-foreground ml-1">(Du)</span>}
+                              </span>
+                            </div>
+
+                            {/* Total */}
+                            <div className="text-right shrink-0 min-w-[60px]">
+                              <span className={cn(
+                                'font-mono font-black text-lg',
+                                score.totalPoints > 0 ? 'text-green-500' : 
+                                score.totalPoints < 0 ? 'text-red-500' : 'text-muted-foreground'
+                              )}>
+                                {score.totalPoints > 0 ? '+' : ''}{score.totalPoints}
+                              </span>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                </motion.div>
+              ) : (
+                <Card className="glass p-6 text-center">
+                  <motion.div
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    className="text-muted-foreground"
+                  >
+                    Weiter geht's...
+                  </motion.div>
+                </Card>
+              )}
             </motion.div>
           )}
 

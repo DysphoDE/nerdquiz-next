@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import type { RoomState, AnswerResult, FinalRanking, Player, GameStatistics } from '@/types/game';
 
-// Bonus Round End Result
+// Bonus Round End Result (Collective List)
 export interface BonusRoundPlayerScore {
   playerId: string;
   playerName: string;
@@ -25,6 +25,29 @@ export interface BonusRoundEndResult {
   totalRevealed: number;
   totalItems: number;
   playerScoreBreakdown: BonusRoundPlayerScore[];
+}
+
+// Hot Button Events
+export interface HotButtonBuzzEvent {
+  playerId: string;
+  playerName: string;
+  avatarSeed: string;
+  buzzTimeMs: number;
+  revealedPercent: number;
+  timerEnd: number;
+}
+
+export interface HotButtonEndPlayerScore {
+  playerId: string;
+  playerName: string;
+  avatarSeed: string;
+  totalPoints: number;
+  rank: number;
+}
+
+export interface HotButtonEndResult {
+  totalQuestions: number;
+  playerScoreBreakdown: HotButtonEndPlayerScore[];
 }
 
 interface GameStore {
@@ -47,6 +70,10 @@ interface GameStore {
   gameStatistics: GameStatistics | null;
   bonusRoundResult: BonusRoundEndResult | null;
   
+  // Hot Button specific state
+  hotButtonBuzz: HotButtonBuzzEvent | null;
+  hotButtonEndResult: HotButtonEndResult | null;
+  
   // Actions
   setConnected: (connected: boolean) => void;
   setPlayer: (playerId: string, roomCode: string) => void;
@@ -58,6 +85,8 @@ interface GameStore {
   setFinalRankings: (rankings: FinalRanking[] | null) => void;
   setGameStatistics: (stats: GameStatistics | null) => void;
   setBonusRoundResult: (result: BonusRoundEndResult | null) => void;
+  setHotButtonBuzz: (buzz: HotButtonBuzzEvent | null) => void;
+  setHotButtonEndResult: (result: HotButtonEndResult | null) => void;
   
   // Utility
   reset: () => void;
@@ -76,6 +105,8 @@ const initialState = {
   finalRankings: null as FinalRanking[] | null,
   gameStatistics: null as GameStatistics | null,
   bonusRoundResult: null as BonusRoundEndResult | null,
+  hotButtonBuzz: null as HotButtonBuzzEvent | null,
+  hotButtonEndResult: null as HotButtonEndResult | null,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -101,6 +132,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   setBonusRoundResult: (result) => set({ bonusRoundResult: result }),
   
+  setHotButtonBuzz: (buzz) => set({ hotButtonBuzz: buzz }),
+  
+  setHotButtonEndResult: (result) => set({ hotButtonEndResult: result }),
+  
   reset: () => set(initialState),
   
   resetQuestion: () => set({ 
@@ -108,6 +143,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     estimationValue: '',
     hasSubmitted: false,
     lastResults: null,
+    hotButtonBuzz: null,
+    hotButtonEndResult: null,
   }),
 }));
 

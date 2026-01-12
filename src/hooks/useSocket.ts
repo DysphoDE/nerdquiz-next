@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { useGameStore, type BonusRoundEndResult } from '@/store/gameStore';
+import { useGameStore, type BonusRoundEndResult, type HotButtonBuzzEvent, type HotButtonEndResult } from '@/store/gameStore';
 import type { RoomState, AnswerResult, FinalRanking, GameStatistics } from '@/types/game';
 import { getSocket } from '@/lib/socket';
 import { saveSession, clearSession } from '@/lib/session';
@@ -16,6 +16,8 @@ export function useSocket() {
     setFinalRankings,
     setGameStatistics,
     setBonusRoundResult,
+    setHotButtonBuzz,
+    setHotButtonEndResult,
     resetQuestion,
     reset,
   } = useGameStore();
@@ -83,6 +85,18 @@ export function useSocket() {
       setBonusRoundResult(data);
     };
 
+    const handleHotButtonBuzz = (data: HotButtonBuzzEvent) => {
+      console.log('🔔 Hot button buzz:', data);
+      setHotButtonBuzz(data);
+      // Auto-clear buzz after overlay duration
+      setTimeout(() => setHotButtonBuzz(null), 2500);
+    };
+
+    const handleHotButtonEnd = (data: HotButtonEndResult) => {
+      console.log('🏁 Hot button round ended:', data);
+      setHotButtonEndResult(data);
+    };
+
     const handleKickedFromRoom = (data: { reason: string }) => {
       console.log('👋 Kicked from room:', data.reason);
       clearSession();
@@ -110,6 +124,8 @@ export function useSocket() {
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('player_answered', handlePlayerAnswered);
     socket.on('bonus_round_end', handleBonusRoundEnd);
+    socket.on('hot_button_buzz', handleHotButtonBuzz);
+    socket.on('hot_button_end', handleHotButtonEnd);
     socket.on('kicked_from_room', handleKickedFromRoom);
     socket.on('rematch_result', handleRematchResult);
 
@@ -133,10 +149,12 @@ export function useSocket() {
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('player_answered', handlePlayerAnswered);
       socket.off('bonus_round_end', handleBonusRoundEnd);
+      socket.off('hot_button_buzz', handleHotButtonBuzz);
+      socket.off('hot_button_end', handleHotButtonEnd);
       socket.off('kicked_from_room', handleKickedFromRoom);
       socket.off('rematch_result', handleRematchResult);
     };
-  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setBonusRoundResult, resetQuestion, reset]);
+  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setBonusRoundResult, setHotButtonBuzz, setHotButtonEndResult, resetQuestion, reset]);
 
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store
