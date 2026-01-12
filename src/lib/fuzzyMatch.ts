@@ -5,6 +5,7 @@
  */
 
 import { distance } from 'fastest-levenshtein';
+import { MATCHING } from '@/config/constants';
 
 /**
  * Normalisiert einen String für den Vergleich:
@@ -107,7 +108,7 @@ export function checkAnswer(
   input: string,
   items: CollectiveListItem[],
   alreadyGuessed: Set<string>,
-  fuzzyThreshold: number = 0.85
+  fuzzyThreshold: number = MATCHING.FUZZY_THRESHOLD
 ): MatchResult {
   const normalizedInput = normalizeString(input);
   

@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'fra
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/store/gameStore';
 import { loadSession, clearSession, type GameSession } from '@/lib/session';
+import { ROOM_VALIDATION } from '@/config/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -197,7 +198,7 @@ export function HomeScreen() {
 
   const handleJoin = async () => {
     if (!name.trim()) return setError('Name wird benötigt');
-    if (roomCode.length !== 4) return setError('Code muss 4 Zeichen haben');
+    if (roomCode.length !== ROOM_VALIDATION.CODE_LENGTH) return setError(`Code muss ${ROOM_VALIDATION.CODE_LENGTH} Zeichen haben`);
     setLoading(true); setError(null);
     const result = await joinRoom(roomCode.toUpperCase(), name.trim());
     if (result.success) router.push(`/room/${roomCode.toUpperCase()}`);
@@ -245,7 +246,7 @@ export function HomeScreen() {
             placeholder="Spielername"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && name.trim() && roomCode.length === 4 && handleJoin()}
+            onKeyDown={(e) => e.key === 'Enter' && name.trim() && roomCode.length === ROOM_VALIDATION.CODE_LENGTH && handleJoin()}
             className="bg-zinc-900 border-zinc-800 h-14"
             autoFocus={isDesktop}
           />
@@ -255,9 +256,9 @@ export function HomeScreen() {
           <Input
             value={roomCode}
             onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === 'Enter' && name.trim() && roomCode.length === 4 && handleJoin()}
+            onKeyDown={(e) => e.key === 'Enter' && name.trim() && roomCode.length === ROOM_VALIDATION.CODE_LENGTH && handleJoin()}
             placeholder="ABCD"
-            maxLength={4}
+            maxLength={ROOM_VALIDATION.CODE_LENGTH}
             className="bg-zinc-900 border-zinc-800 h-14 text-center font-mono text-2xl tracking-widest uppercase focus-visible:ring-emerald-500"
           />
         </div>
@@ -268,7 +269,7 @@ export function HomeScreen() {
       <Button
         className="w-full h-12 text-lg font-bold bg-emerald-600 hover:bg-emerald-500"
         onClick={handleJoin}
-        disabled={loading || !name.trim() || roomCode.length !== 4}
+        disabled={loading || !name.trim() || roomCode.length !== ROOM_VALIDATION.CODE_LENGTH}
       >
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Beitreten'}
       </Button>

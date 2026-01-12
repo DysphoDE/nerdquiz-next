@@ -146,7 +146,7 @@ export function selectCategoryMode(room: GameRoom): CategorySelectionMode {
 export function startCategoryVoting(room: GameRoom, io: SocketServer): void {
   const roomCode = room.code; // Capture room code for timer
   room.state.phase = 'category_voting';
-  room.state.timerEnd = Date.now() + 15000;
+  room.state.timerEnd = Date.now() + GAME_TIMERS.CATEGORY_VOTING;
 
   emitPhaseChange(room, io, 'category_voting');
   broadcastRoomUpdate(room, io);
@@ -366,7 +366,7 @@ export async function finalizeWheelSelection(room: GameRoom, io: SocketServer, c
 export function startLosersPick(room: GameRoom, io: SocketServer): void {
   const roomCode = room.code; // Capture for timer
   room.state.phase = 'category_losers_pick';
-  room.state.timerEnd = Date.now() + 15000;
+  room.state.timerEnd = Date.now() + GAME_TIMERS.LOSERS_PICK;
 
   emitPhaseChange(room, io, 'category_losers_pick');
   broadcastRoomUpdate(room, io);
@@ -620,7 +620,7 @@ export function checkDiceRoyaleResult(room: GameRoom, io: SocketServer): void {
  */
 export function startDiceRoyalePick(room: GameRoom, io: SocketServer): void {
   const roomCode = room.code; // Capture for timer
-  room.state.timerEnd = Date.now() + 15000;
+  room.state.timerEnd = Date.now() + GAME_TIMERS.DICE_ROYALE_PICK;
   io.to(roomCode).emit('dice_royale_pick');
   broadcastRoomUpdate(room, io);
 
@@ -788,7 +788,7 @@ export function startRPSRound(room: GameRoom, io: SocketServer): void {
   if (!duel) return;
 
   const capturedRound = duel.currentRound; // Capture for validation
-  room.state.timerEnd = Date.now() + 10000;
+  room.state.timerEnd = Date.now() + GAME_TIMERS.RPS_ROUND;
   io.to(roomCode).emit('rps_round_start', { round: duel.currentRound });
   broadcastRoomUpdate(room, io);
 
@@ -953,7 +953,7 @@ function finalizeRPSDuelWinner(room: GameRoom, io: SocketServer, winnerId: strin
  */
 export function startRPSDuelPick(room: GameRoom, io: SocketServer): void {
   const roomCode = room.code; // Capture for timer
-  room.state.timerEnd = Date.now() + 15000;
+  room.state.timerEnd = Date.now() + GAME_TIMERS.RPS_DUEL_PICK;
   io.to(roomCode).emit('rps_duel_pick');
   broadcastRoomUpdate(room, io);
 

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/store/gameStore';
 import { loadSession, hasSessionForRoom, clearSession } from '@/lib/session';
+import { PLAYER_VALIDATION } from '@/config/constants';
 import { DevPanel } from '@/components/dev/DevPanel';
 import { QuestionDebugPanel } from '@/components/dev/QuestionDebugPanel';
 import { Button } from '@/components/ui/button';
@@ -220,7 +221,7 @@ export default function RoomPage() {
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 placeholder="z.B. QuizMaster"
-                maxLength={16}
+                maxLength={PLAYER_VALIDATION.NAME_MAX_LENGTH}
                 className="h-14 text-lg bg-card border-border"
                 autoFocus
               />

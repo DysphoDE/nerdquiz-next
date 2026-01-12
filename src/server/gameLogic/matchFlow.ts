@@ -285,7 +285,7 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
       default:
         startCategoryVoting(currentRoom, io);
     }
-  }, 5500);
+  }, UI_TIMING.WHEEL_ANIMATION);
 }
 
 // ============================================
@@ -428,7 +428,7 @@ export function startRematchVoting(room: GameRoom, io: SocketServer): void {
   const roomCode = room.code; // Capture for timer
   room.state.phase = 'rematch_voting';
   room.state.rematchVotes = new Map();
-  room.state.timerEnd = Date.now() + 20000;
+  room.state.timerEnd = Date.now() + GAME_TIMERS.REMATCH_VOTING;
   
   console.log(`🗳️ Rematch voting started in room ${roomCode}`);
   

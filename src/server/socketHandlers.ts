@@ -37,6 +37,10 @@ import {
   EnableDevModeSchema,
   DevCommandSchema,
 } from '@/lib/validations/socket';
+import {
+  UI_TIMING,
+  ROOM_LIMITS,
+} from '@/config/constants';
 
 // Game Logic Imports
 import {
@@ -224,8 +228,8 @@ function handleJoinRoom(socket: Socket, io: SocketServer) {
       return;
     }
 
-    if (room.players.size >= 12) {
-      callback({ success: false, error: 'Raum ist voll (max. 12)' });
+    if (room.players.size >= ROOM_LIMITS.MAX_PLAYERS) {
+      callback({ success: false, error: `Raum ist voll (max. ${ROOM_LIMITS.MAX_PLAYERS})` });
       return;
     }
 
@@ -606,7 +610,7 @@ function handleDevCommand(io: SocketServer) {
             room.state.currentQuestionIndex = 0;
             startQuestion(room, io);
           }
-        }, 500);
+        }, UI_TIMING.SHORT_DELAY);
         break;
       }
 
@@ -981,7 +985,7 @@ function checkPhaseProgressAfterDisconnect(room: GameRoom, io: SocketServer, dis
           if (currentRoom && currentRoom.state.phase === 'category_rps_duel') {
             startRPSDuelPick(currentRoom, io);
           }
-        }, 2000);
+        }, UI_TIMING.STANDARD_TRANSITION);
       }
       break;
     }
@@ -1108,7 +1112,7 @@ function setupBotHandlers(io: SocketServer) {
       if (royale.playerRolls.get(pid) === null) allRolled = false;
     });
     if (allRolled) {
-      setTimeout(() => checkDiceRoyaleResult(room, io), 1500);
+      setTimeout(() => checkDiceRoyaleResult(room, io), UI_TIMING.MEDIUM_DELAY);
     }
   });
 
