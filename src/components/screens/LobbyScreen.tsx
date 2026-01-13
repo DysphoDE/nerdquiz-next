@@ -198,19 +198,21 @@ function SettingControl({
   const canIncrease = currentIndex < options.length - 1;
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
+    <div className="flex flex-col gap-2 p-3 rounded-xl bg-muted/30">
+      {/* Label Row */}
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Icon className="w-4 h-4 text-primary" />
+        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Icon className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
         </div>
-        <span className="text-sm font-medium">{label}</span>
+        <span className="text-xs sm:text-sm font-medium">{label}</span>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Controls Row */}
+      <div className="flex items-center justify-center gap-3">
         <button
           onClick={() => canDecrease && onChange(options[currentIndex - 1])}
           disabled={!canDecrease}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
             canDecrease 
               ? 'bg-background hover:bg-muted text-foreground' 
               : 'text-muted-foreground/30 cursor-not-allowed'
@@ -219,12 +221,12 @@ function SettingControl({
           <Minus className="w-4 h-4" />
         </button>
 
-        <span className="w-8 text-center text-lg font-bold text-primary">{value}</span>
+        <span className="w-10 text-center text-xl font-bold text-primary">{value}</span>
 
         <button
           onClick={() => canIncrease && onChange(options[currentIndex + 1])}
           disabled={!canIncrease}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
             canIncrease 
               ? 'bg-background hover:bg-muted text-foreground' 
               : 'text-muted-foreground/30 cursor-not-allowed'

@@ -692,22 +692,22 @@ export function CustomGameConfigurator({
   
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[85vh] flex flex-col">
-        <DrawerHeader className="flex-shrink-0">
+      <DrawerContent className="h-[95vh] max-h-[95vh] flex flex-col">
+        <DrawerHeader className="flex-shrink-0 pb-2">
           <DrawerTitle className="flex items-center justify-center gap-2">
             <Settings2 className="w-5 h-5 text-primary" />
             Spielablauf anpassen
           </DrawerTitle>
-          <DrawerDescription className="text-center">
+          <DrawerDescription className="text-center text-xs">
             Erstelle deine eigene Rundenfolge
           </DrawerDescription>
         </DrawerHeader>
         
-        <div className="px-4 flex-1 min-h-0 overflow-hidden">
+        <div className="px-4 flex-1 min-h-0 overflow-hidden pb-2">
           {content}
         </div>
         
-        <DrawerFooter className="flex-shrink-0">
+        <DrawerFooter className="flex-shrink-0 pt-2">
           <Button onClick={() => onOpenChange(false)} className="gap-2">
             <Check className="w-4 h-4" />
             Fertig
