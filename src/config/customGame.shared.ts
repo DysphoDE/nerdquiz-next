@@ -191,3 +191,62 @@ export function getCategoryModeEmoji(mode: CategorySelectionMode | 'random'): st
   const modeData = CATEGORY_SELECTION_MODES_DATA.find(m => m.id === mode);
   return modeData?.emoji || '❓';
 }
+
+// ============================================
+// LOCAL STORAGE PERSISTENCE
+// ============================================
+
+const CUSTOM_GAME_STORAGE_KEY = 'nerdquiz_custom_game_config';
+
+/**
+ * Gespeicherte Spielkonfiguration
+ */
+export interface SavedCustomGameConfig {
+  customMode: boolean;
+  customRounds: CustomRoundConfig[];
+  questionsPerRound: number;
+  maxRounds: number;
+  bonusRoundChance?: number;
+  finalRoundAlwaysBonus?: boolean;
+}
+
+/**
+ * Speichert die aktuelle Spielkonfiguration im localStorage
+ */
+export function saveCustomGameConfig(config: SavedCustomGameConfig): void {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    localStorage.setItem(CUSTOM_GAME_STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.warn('Failed to save custom game config to localStorage', e);
+  }
+}
+
+/**
+ * Lädt die gespeicherte Spielkonfiguration aus dem localStorage
+ */
+export function loadCustomGameConfig(): SavedCustomGameConfig | null {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const saved = localStorage.getItem(CUSTOM_GAME_STORAGE_KEY);
+    if (!saved) return null;
+    
+    const config = JSON.parse(saved) as SavedCustomGameConfig;
+    
+    // Validiere die geladenen Runden
+    if (config.customRounds && config.customRounds.length > 0) {
+      const validation = validateCustomRounds(config.customRounds);
+      if (!validation.valid) {
+        console.warn('Saved custom rounds invalid, ignoring:', validation.error);
+        return null;
+      }
+    }
+    
+    return config;
+  } catch (e) {
+    console.warn('Failed to load custom game config from localStorage', e);
+    return null;
+  }
+}

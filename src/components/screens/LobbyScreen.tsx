@@ -39,7 +39,12 @@ import {
   DEFAULT_AVATAR_OPTIONS,
 } from '@/components/game/AvatarCustomizer';
 import { CustomGameConfigurator, RoundSequencePreview } from '@/components/game/CustomGameConfigurator';
-import { createDefaultCustomRounds, type CustomRoundConfig } from '@/config/customGame.shared';
+import { 
+  createDefaultCustomRounds, 
+  type CustomRoundConfig,
+  saveCustomGameConfig,
+  loadCustomGameConfig,
+} from '@/config/customGame.shared';
 
 // ============================================
 // PLAYER CARD
@@ -411,6 +416,73 @@ export function LobbyScreen() {
     updateAvatar(optionsToSeed(randomOptions));
   }, [updateAvatar]);
   
+  // Load saved custom game config when host enters lobby
+  const hasLoadedSavedConfig = useRef(false);
+  // Speichere die Custom-Rounds separat, damit sie beim Moduswechsel nicht verloren gehen
+  const savedCustomRoundsRef = useRef<CustomRoundConfig[] | null>(null);
+  
+  useEffect(() => {
+    if (!isHost || !room || hasLoadedSavedConfig.current) return;
+    
+    const savedConfig = loadCustomGameConfig();
+    if (savedConfig) {
+      hasLoadedSavedConfig.current = true;
+      
+      // Speichere die Custom-Rounds für späteren Zugriff
+      if (savedConfig.customRounds && savedConfig.customRounds.length > 0) {
+        savedCustomRoundsRef.current = savedConfig.customRounds;
+      }
+      
+      // Wende die gespeicherte Konfiguration an
+      updateSettings({
+        customMode: savedConfig.customMode,
+        customRounds: savedConfig.customRounds,
+        questionsPerRound: savedConfig.questionsPerRound,
+        maxRounds: savedConfig.maxRounds,
+        bonusRoundChance: savedConfig.bonusRoundChance,
+        finalRoundAlwaysBonus: savedConfig.finalRoundAlwaysBonus,
+      });
+    }
+  }, [isHost, room, updateSettings]);
+  
+  // Aktualisiere savedCustomRoundsRef wenn Custom-Rounds geändert werden (nur im Custom-Modus)
+  useEffect(() => {
+    if (!isHost || !room) return;
+    
+    if (room.settings.customMode && room.settings.customRounds && room.settings.customRounds.length > 0) {
+      savedCustomRoundsRef.current = room.settings.customRounds;
+    }
+  }, [isHost, room, room?.settings.customMode, room?.settings.customRounds]);
+  
+  // Save config whenever settings change (only for host)
+  useEffect(() => {
+    if (!isHost || !room) return;
+    
+    // Speichere die aktuelle Konfiguration
+    // Verwende savedCustomRoundsRef wenn wir nicht im Custom-Modus sind, um die Konfiguration zu erhalten
+    const roundsToSave = room.settings.customMode 
+      ? (room.settings.customRounds ?? [])
+      : (savedCustomRoundsRef.current ?? room.settings.customRounds ?? []);
+    
+    saveCustomGameConfig({
+      customMode: room.settings.customMode ?? false,
+      customRounds: roundsToSave,
+      questionsPerRound: room.settings.questionsPerRound,
+      maxRounds: room.settings.maxRounds,
+      bonusRoundChance: room.settings.bonusRoundChance,
+      finalRoundAlwaysBonus: room.settings.finalRoundAlwaysBonus,
+    });
+  }, [
+    isHost,
+    room,
+    room?.settings.customMode,
+    room?.settings.customRounds,
+    room?.settings.questionsPerRound,
+    room?.settings.maxRounds,
+    room?.settings.bonusRoundChance,
+    room?.settings.finalRoundAlwaysBonus,
+  ]);
+  
   // Dev mode listener
   const typedCharsRef = useRef('');
   
@@ -584,11 +656,14 @@ export function LobbyScreen() {
                   customMode={room.settings.customMode ?? false}
                   onChange={(isCustom) => {
                     if (isCustom) {
-                      const defaultRounds = createDefaultCustomRounds(room.settings.maxRounds);
+                      // Verwende gespeicherte Rounds wenn vorhanden, sonst erstelle neue
+                      const roundsToUse = savedCustomRoundsRef.current && savedCustomRoundsRef.current.length > 0
+                        ? savedCustomRoundsRef.current
+                        : createDefaultCustomRounds(room.settings.maxRounds);
                       updateSettings({ 
                         customMode: true, 
-                        customRounds: defaultRounds,
-                        maxRounds: defaultRounds.length,
+                        customRounds: roundsToUse,
+                        maxRounds: roundsToUse.length,
                       });
                     } else {
                       updateSettings({ customMode: false });

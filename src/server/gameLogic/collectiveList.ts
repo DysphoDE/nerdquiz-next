@@ -383,12 +383,26 @@ export function eliminateCollectiveListPlayer(
   const wasSinglePlayer = bonusRound.turnOrder.length === 1;
   
   if (!wasSinglePlayer && bonusRound.activePlayers.length <= 1) {
-    // Multi-Player: Last player standing wins
-    endCollectiveListRound(room, io, 'last_standing');
+    // Multi-Player: Last player standing wins - mit Delay für Reveal-Animation
+    broadcastRoomUpdate(room, io);
+    setTimeout(() => {
+      const { getRoom } = require('../roomStore');
+      const currentRoom = getRoom(roomCode);
+      if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
+        endCollectiveListRound(currentRoom, io, 'last_standing');
+      }
+    }, COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY);
     return;
   } else if (wasSinglePlayer && bonusRound.activePlayers.length === 0) {
-    // Single-Player: Player eliminated themselves (wrong answer or skip)
-    endCollectiveListRound(room, io, 'last_standing');
+    // Single-Player: Player eliminated themselves (wrong answer or skip) - mit Delay für Reveal-Animation
+    broadcastRoomUpdate(room, io);
+    setTimeout(() => {
+      const { getRoom } = require('../roomStore');
+      const currentRoom = getRoom(roomCode);
+      if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
+        endCollectiveListRound(currentRoom, io, 'last_standing');
+      }
+    }, COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY);
     return;
   }
 

@@ -123,14 +123,23 @@ export const COLLECTIVE_LIST_TIMING = {
   /** Zeit pro Spieler-Zug (15s) */
   TURN_DURATION: 15000,
   
-  /** Delay nach Antwort für Popup-Anzeige (2.5s) - muss mit Client-Popup übereinstimmen */
-  POPUP_DISPLAY_DELAY: 2500,
+  /** Phase 1: "NAME sagt:" erscheint (600ms) */
+  REVEAL_PHASE_1: 600,
   
-  /** Delay nach richtiger Antwort (Popup + kleiner Buffer) */
-  CORRECT_ANSWER_DELAY: 2700,
+  /** Phase 2: Begriff wird gezeigt (800ms) */
+  REVEAL_PHASE_2: 800,
   
-  /** Delay nach Elimination (Popup + kleiner Buffer) */
-  ELIMINATION_DELAY: 2700,
+  /** Phase 3: Auflösung richtig/falsch (1200ms) */
+  REVEAL_PHASE_3: 1200,
+  
+  /** Gesamt-Delay für Antwort-Feedback (Phase 1 + 2 + 3 = 2600ms) */
+  FEEDBACK_TOTAL_DELAY: 2600,
+  
+  /** Delay nach richtiger Antwort (Feedback + kleiner Buffer) */
+  CORRECT_ANSWER_DELAY: 2800,
+  
+  /** Delay nach Elimination (Feedback + kleiner Buffer) */
+  ELIMINATION_DELAY: 2800,
   
   /** Finale Auswertung (8s) */
   FINAL_RESULTS: 8000,

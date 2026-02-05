@@ -13,7 +13,7 @@ import {
   Crown,
   AlertCircle,
   Flame,
-  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, usePlayers, type BonusRoundEndResult } from '@/store/gameStore';
@@ -28,6 +28,25 @@ import type { CollectiveListBonusRound } from '@/types/game';
 // TURN INDICATOR MIT ZÜNDSCHNUR
 // ============================================
 
+interface AnswerFeedback {
+  playerId: string;
+  playerName: string;
+  avatarSeed: string;
+  input: string;
+  result: 'correct' | 'wrong' | 'already_guessed' | 'timeout' | 'skip';
+  matchedDisplay?: string;
+}
+
+// Animation Phasen für gestaffelte Auflösung
+type RevealPhase = 'pending' | 'showing' | 'revealed';
+
+// Timing-Konstanten für die Animation (in ms)
+const REVEAL_TIMINGS = {
+  PHASE_1: 600,  // "NAME sagt:" erscheint
+  PHASE_2: 800,  // Begriff wird gezeigt
+  PHASE_3: 1200, // Auflösung richtig/falsch
+};
+
 interface TurnIndicatorProps {
   currentTurnPlayer: { id: string; name: string; avatarSeed: string };
   isMyTurn: boolean;
@@ -35,7 +54,7 @@ interface TurnIndicatorProps {
   timerEnd: number | null;
   serverTime?: number;
   timePerTurn: number;
-  isPaused: boolean;
+  answerFeedback: AnswerFeedback | null;
 }
 
 function TurnIndicatorWithFuse({
@@ -45,9 +64,11 @@ function TurnIndicatorWithFuse({
   timerEnd,
   serverTime,
   timePerTurn,
-  isPaused,
+  answerFeedback,
 }: TurnIndicatorProps) {
   const { remaining } = useGameTimer(timerEnd, serverTime);
+  const [revealPhase, setRevealPhase] = useState<RevealPhase>('pending');
+  const lastFeedbackRef = useRef<string | null>(null);
   
   // Progress berechnen (0-100, wo 100 = voll, 0 = Zeit abgelaufen)
   const progress = timerEnd && timePerTurn > 0 
@@ -58,140 +79,336 @@ function TurnIndicatorWithFuse({
   const isWarning = remaining <= 5 && remaining > 3;
   const isCritical = remaining <= 3 && remaining > 0;
   
+  // Gestaffelte Animation starten wenn neues Feedback kommt
+  useEffect(() => {
+    if (!answerFeedback) {
+      setRevealPhase('pending');
+      lastFeedbackRef.current = null;
+      return;
+    }
+    
+    // Unique ID für dieses Feedback
+    const feedbackId = `${answerFeedback.playerId}-${answerFeedback.input}-${answerFeedback.result}`;
+    if (lastFeedbackRef.current === feedbackId) return;
+    lastFeedbackRef.current = feedbackId;
+    
+    // Phase 1: "NAME sagt:" (sofort)
+    setRevealPhase('pending');
+    
+    // Phase 2: Begriff zeigen
+    const timer1 = setTimeout(() => {
+      setRevealPhase('showing');
+    }, REVEAL_TIMINGS.PHASE_1);
+    
+    // Phase 3: Auflösung
+    const timer2 = setTimeout(() => {
+      setRevealPhase('revealed');
+    }, REVEAL_TIMINGS.PHASE_1 + REVEAL_TIMINGS.PHASE_2);
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [answerFeedback]);
+  
+  // Feedback-Farben (nur in Phase 3 sichtbar)
+  const getFeedbackColor = (result: string, phase: RevealPhase) => {
+    if (phase !== 'revealed') return 'border-muted bg-muted/5';
+    switch (result) {
+      case 'correct': return 'border-green-500/50 bg-green-500/10';
+      case 'already_guessed': return 'border-orange-500/50 bg-orange-500/10';
+      default: return 'border-red-500/50 bg-red-500/10';
+    }
+  };
+  
+  // Avatar Mood (nur in Phase 3 emotional)
+  const getFeedbackMood = (result: string, phase: RevealPhase): 'happy' | 'sad' | 'confused' | 'angry' | 'neutral' => {
+    if (phase !== 'revealed') return 'neutral';
+    switch (result) {
+      case 'correct': return 'happy';
+      case 'already_guessed': return 'confused';
+      case 'timeout': return 'angry';
+      default: return 'sad';
+    }
+  };
+  
+  // Border-Farbe für Avatar (nur in Phase 3)
+  const getAvatarBorder = (result: string, phase: RevealPhase) => {
+    if (phase !== 'revealed') return 'border-muted';
+    switch (result) {
+      case 'correct': return 'border-green-500';
+      case 'already_guessed': return 'border-orange-500';
+      default: return 'border-red-500';
+    }
+  };
+  
+  // Text-Farbe (nur in Phase 3)
+  const getTextColor = (result: string, phase: RevealPhase) => {
+    if (phase !== 'revealed') return 'text-foreground';
+    switch (result) {
+      case 'correct': return 'text-green-400';
+      case 'already_guessed': return 'text-orange-400';
+      default: return 'text-red-400';
+    }
+  };
+  
   return (
     <Card className={cn(
-      'glass p-3 sm:p-4 mb-4 transition-all overflow-hidden',
-      isMyTurn && 'border-amber-500/50 bg-amber-500/5'
+      'glass p-3 sm:p-4 mb-4 transition-all duration-300 overflow-hidden',
+      answerFeedback 
+        ? getFeedbackColor(answerFeedback.result, revealPhase)
+        : isMyTurn && 'border-amber-500/50 bg-amber-500/5'
     )}>
       <div className="flex items-center gap-3">
-        {/* Avatar */}
-        <GameAvatar
-          seed={currentTurnPlayer.avatarSeed}
-          mood={isMyTurn ? 'hopeful' : 'neutral'}
-          size="md"
-          className={cn(
-            'border-2 shrink-0',
-            isMyTurn ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-muted'
-          )}
-        />
-        
-        {/* Text */}
-        <div className="flex-1 min-w-0">
-          <p className={cn(
-            'font-bold text-base sm:text-lg',
-            isMyTurn && 'text-amber-500'
-          )}>
-            {isMyTurn ? 'Du bist dran!' : `${currentTurnPlayer.name} ist dran`}
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Zug #{turnNumber}
-          </p>
-        </div>
-        
-        {/* Zündschnur (rechtsbündig, füllt verfügbaren Platz) */}
-        <div className="relative flex-1 max-w-[200px] sm:max-w-none h-6 ml-2">
-          {/* Bombe am linken Ende (größer) */}
-          <div className={cn(
-            'absolute left-0 top-1/2 -translate-y-1/2 text-xl z-20 transition-transform',
-            isCritical && 'animate-pulse scale-150'
-          )}>
-            💣
-          </div>
-          
-          {/* Schnur-Container (mit Platz für Bombe links) */}
-          <div className="absolute left-7 right-0 top-1/2 -translate-y-1/2 h-3">
-            {/* Schnur-Hintergrund */}
-            <div className="absolute inset-0 rounded-full bg-muted/40 border border-muted overflow-hidden">
-              {/* Textur-Striche */}
-              {Array.from({ length: 15 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute top-0 bottom-0 w-px bg-muted-foreground/15"
-                  style={{ left: `${(i + 1) * 6.25}%` }}
-                />
-              ))}
-            </div>
-            
-            {/* Verbleibende Schnur (startet rechts, schrumpft nach rechts = brennt nach links zur Bombe) */}
+        <AnimatePresence mode="wait">
+          {answerFeedback ? (
+            /* === FEEDBACK MODUS MIT GESTAFFELTER ANIMATION - ZENTRIERT === */
             <motion.div
-              className={cn(
-                'absolute top-0 bottom-0 left-0 rounded-full',
-                isCritical 
-                  ? 'bg-gradient-to-r from-orange-400 via-red-500 to-red-700' 
-                  : isWarning 
-                    ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600'
-                    : 'bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-700'
-              )}
-              style={{ width: `${progress}%` }}
-            />
-            
-            {/* Flamme am brennenden Ende (rechts, bewegt sich nach links zur Bombe) */}
-            {progress > 3 && !isPaused && (
-              <motion.div
-                className="absolute top-1/2 -translate-y-1/2 z-10"
-                style={{ left: `calc(${progress}% - 8px)` }}
-              >
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.4, 1.1, 1.3, 1],
-                    rotate: [0, -5, 5, -3, 0],
-                  }}
-                  transition={{ repeat: Infinity, duration: 0.35, ease: 'easeInOut' }}
-                  className="relative"
-                >
-                  {/* Äußerer Glow */}
-                  <div className={cn(
-                    'absolute -inset-1 rounded-full blur-md opacity-70',
-                    isCritical ? 'bg-red-500' : isWarning ? 'bg-orange-500' : 'bg-amber-500'
-                  )} />
-                  {/* Flammen-Kern */}
-                  <div className={cn(
-                    'relative w-4 h-4 rounded-full',
-                    isCritical ? 'bg-orange-400' : isWarning ? 'bg-yellow-400' : 'bg-yellow-300'
-                  )} />
-                  {/* Heller Kern */}
-                  <div className="absolute inset-1 rounded-full bg-white/80" />
-                </motion.div>
+              key="feedback"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col items-center justify-center flex-1 py-2"
+            >
+              {/* Avatar - Mood ändert sich in Phase 3 */}
+              <div className="relative mb-3">
+                <GameAvatar
+                  seed={answerFeedback.avatarSeed}
+                  mood={getFeedbackMood(answerFeedback.result, revealPhase)}
+                  size="xl"
+                  className={cn(
+                    'border-3 transition-all duration-300',
+                    getAvatarBorder(answerFeedback.result, revealPhase)
+                  )}
+                />
+                {/* Ergebnis-Icon Badge - nur in Phase 3 */}
+                <AnimatePresence>
+                  {revealPhase === 'revealed' && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      className={cn(
+                        'absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-lg',
+                        answerFeedback.result === 'correct' ? 'bg-green-500' : 
+                        answerFeedback.result === 'already_guessed' ? 'bg-orange-500' : 'bg-red-500'
+                      )}
+                    >
+                      {answerFeedback.result === 'correct' ? (
+                        <Check className="w-4 h-4 text-white" />
+                      ) : answerFeedback.result === 'timeout' ? (
+                        <Timer className="w-4 h-4 text-white" />
+                      ) : answerFeedback.result === 'skip' ? (
+                        <SkipForward className="w-4 h-4 text-white" />
+                      ) : (
+                        <X className="w-4 h-4 text-white" />
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              
+              {/* Feedback Text - gestaffelt, zentriert */}
+              <div className="text-center">
+                {/* Phase 1+: "NAME sagt:" */}
+                <p className={cn(
+                  'font-bold text-lg sm:text-xl transition-colors duration-300',
+                  getTextColor(answerFeedback.result, revealPhase)
+                )}>
+                  {answerFeedback.playerName} sagt:
+                </p>
                 
-                {/* Funken (nur bei kritisch, fliegen nach links Richtung Bombe) */}
-                {isCritical && (
-                  <>
-                    <motion.div
-                      className="absolute w-1 h-1 rounded-full bg-yellow-300"
-                      animate={{
-                        x: [0, -8, -12],
-                        y: [0, -6, -10],
-                        opacity: [1, 0.6, 0],
-                      }}
-                      transition={{ repeat: Infinity, duration: 0.4 }}
-                    />
-                    <motion.div
-                      className="absolute w-1 h-1 rounded-full bg-orange-400"
-                      animate={{
-                        x: [0, -5, -10],
-                        y: [0, -8, -14],
-                        opacity: [1, 0.5, 0],
-                      }}
-                      transition={{ repeat: Infinity, duration: 0.5, delay: 0.15 }}
-                    />
-                  </>
+                {/* Phase 2+: Begriff zeigen */}
+                <div className="h-8 flex items-center justify-center">
+                  {revealPhase !== 'pending' && (
+                    <motion.p
+                      key={revealPhase === 'revealed' && answerFeedback.result === 'correct' && answerFeedback.matchedDisplay ? 'corrected' : 'original'}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={cn(
+                        'font-black text-xl sm:text-2xl transition-colors duration-300',
+                        getTextColor(answerFeedback.result, revealPhase)
+                      )}
+                    >
+                      {answerFeedback.result === 'timeout' ? (
+                        '...'
+                      ) : answerFeedback.result === 'skip' ? (
+                        <span className="italic font-normal text-muted-foreground">nichts</span>
+                      ) : (
+                        // Phase 2 (showing): Zeige was getippt wurde
+                        // Phase 3 (revealed) + correct: Zeige den echten Begriff (falls anders)
+                        `"${revealPhase === 'revealed' && answerFeedback.result === 'correct' && answerFeedback.matchedDisplay 
+                          ? answerFeedback.matchedDisplay 
+                          : answerFeedback.input}"`
+                      )}
+                    </motion.p>
+                  )}
+                  {/* Lade-Punkte während Phase 1 */}
+                  {revealPhase === 'pending' && (
+                    <motion.span
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ repeat: Infinity, duration: 1 }}
+                      className="text-xl text-muted-foreground"
+                    >
+                      ...
+                    </motion.span>
+                  )}
+                </div>
+                
+                {/* Phase 3: Status-Text */}
+                <div className="h-6 flex items-center justify-center">
+                  <AnimatePresence>
+                    {revealPhase === 'revealed' && (
+                      <motion.p
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={cn(
+                          'text-sm sm:text-base font-bold',
+                          answerFeedback.result === 'correct' ? 'text-green-500' : 
+                          answerFeedback.result === 'already_guessed' ? 'text-orange-500' : 'text-red-500'
+                        )}
+                      >
+                        {answerFeedback.result === 'correct' ? '✓ Richtig!' : 
+                         answerFeedback.result === 'already_guessed' ? '⚠ Bereits genannt!' : 
+                         answerFeedback.result === 'timeout' ? '⏰ Zeit abgelaufen!' :
+                         answerFeedback.result === 'skip' ? '⏭ Gepasst!' : '✗ Falsch!'}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            /* === NORMALER MODUS === */
+            <motion.div
+              key="normal"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-3 flex-1"
+            >
+              {/* Avatar */}
+              <GameAvatar
+                seed={currentTurnPlayer.avatarSeed}
+                mood={isMyTurn ? 'hopeful' : 'neutral'}
+                size="md"
+                className={cn(
+                  'border-2 shrink-0',
+                  isMyTurn ? 'border-amber-500 ring-2 ring-amber-500/50' : 'border-muted'
                 )}
-              </motion.div>
-            )}
-          </div>
-        </div>
+              />
+              
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  'font-bold text-base sm:text-lg',
+                  isMyTurn && 'text-amber-500'
+                )}>
+                  {isMyTurn ? 'Du bist dran!' : `${currentTurnPlayer.name} ist dran`}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Zug #{turnNumber}
+                </p>
+              </div>
+              
+              {/* Zündschnur (rechtsbündig, füllt verfügbaren Platz) */}
+              <div className="relative flex-1 max-w-[200px] sm:max-w-none h-6 ml-2">
+                {/* Bombe am linken Ende (größer) */}
+                <div className={cn(
+                  'absolute left-0 top-1/2 -translate-y-1/2 text-xl z-20 transition-transform',
+                  isCritical && 'animate-pulse scale-150'
+                )}>
+                  💣
+                </div>
+                
+                {/* Schnur-Container (mit Platz für Bombe links) */}
+                <div className="absolute left-7 right-0 top-1/2 -translate-y-1/2 h-3">
+                  {/* Schnur-Hintergrund */}
+                  <div className="absolute inset-0 rounded-full bg-muted/40 border border-muted overflow-hidden">
+                    {/* Textur-Striche */}
+                    {Array.from({ length: 15 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute top-0 bottom-0 w-px bg-muted-foreground/15"
+                        style={{ left: `${(i + 1) * 6.25}%` }}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Verbleibende Schnur (startet rechts, schrumpft nach rechts = brennt nach links zur Bombe) */}
+                  <motion.div
+                    className={cn(
+                      'absolute top-0 bottom-0 left-0 rounded-full',
+                      isCritical 
+                        ? 'bg-gradient-to-r from-orange-400 via-red-500 to-red-700' 
+                        : isWarning 
+                          ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600'
+                          : 'bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-700'
+                    )}
+                    style={{ width: `${progress}%` }}
+                  />
+                  
+                  {/* Flamme am brennenden Ende (rechts, bewegt sich nach links zur Bombe) */}
+                  {progress > 3 && (
+                    <motion.div
+                      className="absolute top-1/2 -translate-y-1/2 z-10"
+                      style={{ left: `calc(${progress}% - 8px)` }}
+                    >
+                      <motion.div
+                        animate={{ 
+                          scale: [1, 1.4, 1.1, 1.3, 1],
+                          rotate: [0, -5, 5, -3, 0],
+                        }}
+                        transition={{ repeat: Infinity, duration: 0.35, ease: 'easeInOut' }}
+                        className="relative"
+                      >
+                        {/* Äußerer Glow */}
+                        <div className={cn(
+                          'absolute -inset-1 rounded-full blur-md opacity-70',
+                          isCritical ? 'bg-red-500' : isWarning ? 'bg-orange-500' : 'bg-amber-500'
+                        )} />
+                        {/* Flammen-Kern */}
+                        <div className={cn(
+                          'relative w-4 h-4 rounded-full',
+                          isCritical ? 'bg-orange-400' : isWarning ? 'bg-yellow-400' : 'bg-yellow-300'
+                        )} />
+                        {/* Heller Kern */}
+                        <div className="absolute inset-1 rounded-full bg-white/80" />
+                      </motion.div>
+                      
+                      {/* Funken (nur bei kritisch, fliegen nach links Richtung Bombe) */}
+                      {isCritical && (
+                        <>
+                          <motion.div
+                            className="absolute w-1 h-1 rounded-full bg-yellow-300"
+                            animate={{
+                              x: [0, -8, -12],
+                              y: [0, -6, -10],
+                              opacity: [1, 0.6, 0],
+                            }}
+                            transition={{ repeat: Infinity, duration: 0.4 }}
+                          />
+                          <motion.div
+                            className="absolute w-1 h-1 rounded-full bg-orange-400"
+                            animate={{
+                              x: [0, -5, -10],
+                              y: [0, -8, -14],
+                              opacity: [1, 0.5, 0],
+                            }}
+                            transition={{ repeat: Infinity, duration: 0.5, delay: 0.15 }}
+                          />
+                        </>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      
-      {/* Pausiert-Hinweis */}
-      {isPaused && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="mt-2 text-xs text-center text-muted-foreground"
-        >
-          ⏸️ Timer pausiert
-        </motion.div>
-      )}
     </Card>
   );
 }
@@ -218,6 +435,10 @@ export function CollectiveListGame() {
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
+  // Track ob die initiale Grid-Animation bereits abgespielt wurde
+  // Startet als false, wird nach dem ersten Render auf true gesetzt
+  const [hasAnimatedInitialGrid, setHasAnimatedInitialGrid] = useState(false);
+  
   // Popup für letzte Antwort
   const [answerPopup, setAnswerPopup] = useState<{
     playerId: string;
@@ -228,7 +449,10 @@ export function CollectiveListGame() {
     matchedDisplay?: string;
   } | null>(null);
   
-  // Track der zuletzt gefundenen Item-IDs (für Glühbirnen-Markierung)
+  // Track der Reveal-Phase für Grid-Synchronisation
+  const [gridRevealPhase, setGridRevealPhase] = useState<'pending' | 'showing' | 'revealed'>('pending');
+  
+  // Track der zuletzt gefundenen Item-IDs (für Blitz-Markierung)
   const [recentlyFoundIds, setRecentlyFoundIds] = useState<string[]>([]);
 
   const bonusRound = room?.bonusRound as CollectiveListBonusRound | null;
@@ -252,12 +476,45 @@ export function CollectiveListGame() {
     }
   }, [lastResult]);
 
-  // Clear answer popup after delay (muss mit Server POPUP_DISPLAY_DELAY übereinstimmen)
-  const POPUP_DISPLAY_MS = 2500;
+  // Nach der initialen Grid-Animation den Flag setzen, damit nachfolgende Updates keine Animation mehr triggern
+  useEffect(() => {
+    if (bonusRound?.items && bonusRound.items.length > 0 && !hasAnimatedInitialGrid) {
+      // Warte bis die gestaffelte Animation durch ist (max 1.5s + etwas Puffer)
+      const timer = setTimeout(() => {
+        setHasAnimatedInitialGrid(true);
+      }, 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [bonusRound?.items, hasAnimatedInitialGrid]);
+
+  // Clear answer popup after delay und synchronisiere Grid-Reveal-Phase
+  const FEEDBACK_TOTAL_MS = REVEAL_TIMINGS.PHASE_1 + REVEAL_TIMINGS.PHASE_2 + REVEAL_TIMINGS.PHASE_3;
   useEffect(() => {
     if (answerPopup) {
-      const timer = setTimeout(() => setAnswerPopup(null), POPUP_DISPLAY_MS);
-      return () => clearTimeout(timer);
+      // Phase 1: pending (sofort)
+      setGridRevealPhase('pending');
+      
+      // Phase 2: showing
+      const timer1 = setTimeout(() => {
+        setGridRevealPhase('showing');
+      }, REVEAL_TIMINGS.PHASE_1);
+      
+      // Phase 3: revealed - JETZT darf das Grid-Item erscheinen
+      const timer2 = setTimeout(() => {
+        setGridRevealPhase('revealed');
+      }, REVEAL_TIMINGS.PHASE_1 + REVEAL_TIMINGS.PHASE_2);
+      
+      // Popup ausblenden
+      const timer3 = setTimeout(() => {
+        setAnswerPopup(null);
+        setGridRevealPhase('pending'); // Reset für nächste Runde
+      }, FEEDBACK_TOTAL_MS);
+      
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+      };
     }
   }, [answerPopup]);
 
@@ -395,18 +652,6 @@ export function CollectiveListGame() {
   // Sort players for leaderboard (by score)
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
-  // Mood für Avatar basierend auf Popup-Ergebnis (nur gültige DiceBear Dylan Moods)
-  const getPopupMood = (result: string): 'happy' | 'sad' | 'confused' | 'angry' => {
-    switch (result) {
-      case 'correct': return 'happy';
-      case 'wrong': return 'sad';
-      case 'already_guessed': return 'confused';
-      case 'timeout': return 'angry'; // Zeit abgelaufen = frustriert
-      case 'skip': return 'sad'; // Gepasst = traurig
-      default: return 'sad';
-    }
-  };
-
   return (
     <motion.main
       initial={{ opacity: 0 }}
@@ -448,127 +693,6 @@ export function CollectiveListGame() {
         )}
       </AnimatePresence>
 
-      {/* Zentriertes Antwort-Overlay */}
-      <AnimatePresence>
-        {answerPopup && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center p-4"
-          >
-            {/* Abgedunkelter Hintergrund-Kreis */}
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className={cn(
-                'relative flex flex-col items-center p-6 sm:p-8 rounded-3xl shadow-2xl',
-                'backdrop-blur-xl bg-black/70',
-                answerPopup.result === 'correct' 
-                  ? 'ring-4 ring-green-500/50' 
-                  : answerPopup.result === 'already_guessed'
-                    ? 'ring-4 ring-orange-500/50'
-                    : 'ring-4 ring-red-500/50'
-              )}
-            >
-              {/* Avatar mit Ergebnis-Badge */}
-              <div className="relative mb-4">
-                <motion.div
-                  initial={{ scale: 0.5 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                >
-                  <GameAvatar
-                    seed={answerPopup.avatarSeed}
-                    mood={getPopupMood(answerPopup.result)}
-                    size="2xl"
-                    className={cn(
-                      'border-4 shadow-xl',
-                      answerPopup.result === 'correct' ? 'border-green-500' : 
-                      answerPopup.result === 'already_guessed' ? 'border-orange-500' : 'border-red-500'
-                    )}
-                  />
-                </motion.div>
-                
-                {/* Ergebnis-Icon Badge */}
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.15, type: 'spring', stiffness: 500 }}
-                  className={cn(
-                    'absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-lg',
-                    answerPopup.result === 'correct' ? 'bg-green-500' : 
-                    answerPopup.result === 'already_guessed' ? 'bg-orange-500' : 'bg-red-500'
-                  )}
-                >
-                  {answerPopup.result === 'correct' ? (
-                    <Check className="w-6 h-6 text-white" />
-                  ) : answerPopup.result === 'timeout' ? (
-                    <Timer className="w-6 h-6 text-white" />
-                  ) : answerPopup.result === 'skip' ? (
-                    <SkipForward className="w-6 h-6 text-white" />
-                  ) : (
-                    <X className="w-6 h-6 text-white" />
-                  )}
-                </motion.div>
-              </div>
-              
-              {/* Spielername */}
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-sm text-muted-foreground font-medium mb-1"
-              >
-                {answerPopup.playerName}
-              </motion.p>
-              
-              {/* Antwort / Status */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="text-center"
-              >
-                {answerPopup.result === 'timeout' ? (
-                  <div className="flex items-center gap-2 text-red-400">
-                    <Timer className="w-5 h-5" />
-                    <span className="font-bold text-xl">Zeit abgelaufen!</span>
-                  </div>
-                ) : answerPopup.result === 'skip' ? (
-                  <div className="flex items-center gap-2 text-red-400">
-                    <SkipForward className="w-5 h-5" />
-                    <span className="font-bold text-xl">Gepasst!</span>
-                  </div>
-                ) : (
-                  <>
-                    <p className={cn(
-                      'font-bold text-xl sm:text-2xl max-w-[250px] break-words',
-                      answerPopup.result === 'correct' ? 'text-green-400' : 
-                      answerPopup.result === 'already_guessed' ? 'text-orange-400' : 'text-red-400'
-                    )}>
-                      "{answerPopup.result === 'correct' && answerPopup.matchedDisplay 
-                        ? answerPopup.matchedDisplay 
-                        : answerPopup.input}"
-                    </p>
-                    {answerPopup.result === 'already_guessed' && (
-                      <p className="text-sm text-orange-400 mt-2 font-medium">Bereits genannt!</p>
-                    )}
-                    {answerPopup.result === 'wrong' && (
-                      <p className="text-sm text-red-400 mt-2 font-medium">Falsch!</p>
-                    )}
-                    {answerPopup.result === 'correct' && (
-                      <p className="text-sm text-green-400 mt-2 font-medium">Richtig!</p>
-                    )}
-                  </>
-                )}
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
@@ -668,7 +792,7 @@ export function CollectiveListGame() {
               </motion.div>
             )}
 
-            {/* Current Turn Indicator mit Zündschnur */}
+            {/* Current Turn Indicator mit Zündschnur / Antwort-Feedback */}
             {isPlaying && currentTurnPlayer && (
               <TurnIndicatorWithFuse
                 currentTurnPlayer={currentTurnPlayer}
@@ -677,7 +801,7 @@ export function CollectiveListGame() {
                 timerEnd={bonusRound.currentTurn?.timerEnd || null}
                 serverTime={room?.serverTime}
                 timePerTurn={bonusRound.timePerTurn}
-                isPaused={!!answerPopup}
+                answerFeedback={answerPopup}
               />
             )}
 
@@ -706,6 +830,9 @@ export function CollectiveListGame() {
                     // Dynamic animation delay: Max 1.5s total for ALL items across ALL groups
                     const MAX_ANIMATION_DURATION = 1.5;
                     const delayPerItem = Math.min(0.03, MAX_ANIMATION_DURATION / Math.max(allVisibleItems.length, 1));
+                    
+                    // Initiale Animation nur beim ersten Render abspielen
+                    const shouldAnimateInitial = !hasAnimatedInitialGrid;
                     
                     // Second pass: render with global index
                     let globalIndex = 0;
@@ -737,17 +864,23 @@ export function CollectiveListGame() {
                           )}
                           <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {visibleItems.map((item, index) => {
-                              const isRevealed = !!item.guessedBy;
-                              const isUnrevealedAtEnd = isFinished && !isRevealed;
+                              // Prüfe ob dieses Item gerade im Reveal-Popup ist (noch nicht aufgedeckt zeigen)
+                              const isCurrentlyRevealing = answerPopup?.result === 'correct' 
+                                && answerPopup?.matchedDisplay === item.display 
+                                && gridRevealPhase !== 'revealed';
+                              
+                              // Item ist "revealed" wenn es guessedBy hat UND nicht gerade im Reveal ist
+                              const isRevealed = !!item.guessedBy && !isCurrentlyRevealing;
+                              const isUnrevealedAtEnd = isFinished && !item.guessedBy;
                               const itemGlobalIndex = globalIndex++;
-                              const isRecentlyFound = recentlyFoundIds.includes(item.id);
+                              const isRecentlyFound = recentlyFoundIds?.includes(item.id);
                               
                               return (
                                 <motion.div
                                   key={item.id}
-                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  initial={shouldAnimateInitial ? { opacity: 0, scale: 0.8 } : false}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ delay: itemGlobalIndex * delayPerItem }}
+                                  transition={shouldAnimateInitial ? { delay: itemGlobalIndex * delayPerItem } : { duration: 0.2 }}
                                   layout
                                   className={cn(
                                     'px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all',
@@ -767,8 +900,10 @@ export function CollectiveListGame() {
                                           initial={{ scale: 0 }}
                                           animate={{ scale: 1 }}
                                           transition={{ type: 'spring', stiffness: 500 }}
+                                          className="flex items-center"
+                                          title="Gerade gefunden!"
                                         >
-                                          <Sparkles className="w-3 h-3 text-yellow-400" />
+                                          <Zap className="w-3 h-3 text-yellow-400 fill-yellow-400" />
                                         </motion.span>
                                       ) : (
                                         <Check className="w-3 h-3" />
@@ -776,15 +911,10 @@ export function CollectiveListGame() {
                                       {item.display}
                                     </span>
                                   ) : isUnrevealedAtEnd ? (
-                                    <motion.span 
-                                      initial={{ opacity: 0 }}
-                                      animate={{ opacity: 1 }}
-                                      transition={{ delay: itemGlobalIndex * delayPerItem }}
-                                      className="flex items-center gap-1"
-                                    >
+                                    <span className="flex items-center gap-1">
                                       <X className="w-3 h-3" />
                                       {item.display}
-                                    </motion.span>
+                                    </span>
                                   ) : (
                                     <span className="opacity-50">???</span>
                                   )}
