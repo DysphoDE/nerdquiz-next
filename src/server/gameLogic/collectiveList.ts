@@ -178,11 +178,12 @@ export function handleCollectiveListAnswer(room: GameRoom, io: SocketServer, pla
   const bonusRound = room.state.bonusRound;
   if (!bonusRound || bonusRound.type !== 'collective_list') return;
 
-  // Clear timer
+  // Clear timer (both server-side timeout and client-side timerEnd)
   if (bonusRound.currentTurnTimer) {
     clearTimeout(bonusRound.currentTurnTimer);
     bonusRound.currentTurnTimer = null;
   }
+  room.state.timerEnd = null;
 
   const player = room.players.get(playerId);
   if (!player) return;
@@ -287,11 +288,12 @@ export function handleCollectiveListSkip(room: GameRoom, io: SocketServer, playe
   const bonusRound = room.state.bonusRound;
   if (!bonusRound || bonusRound.type !== 'collective_list') return;
 
-  // Clear timer
+  // Clear timer (both server-side timeout and client-side timerEnd)
   if (bonusRound.currentTurnTimer) {
     clearTimeout(bonusRound.currentTurnTimer);
     bonusRound.currentTurnTimer = null;
   }
+  room.state.timerEnd = null;
 
   const player = room.players.get(playerId);
   if (!player) return;
@@ -314,6 +316,9 @@ export function handleCollectiveListSkip(room: GameRoom, io: SocketServer, playe
 export function handleCollectiveListTimeout(room: GameRoom, io: SocketServer, playerId: string): void {
   const bonusRound = room.state.bonusRound;
   if (!bonusRound || bonusRound.type !== 'collective_list') return;
+
+  // Clear client-side timerEnd
+  room.state.timerEnd = null;
 
   const player = room.players.get(playerId);
   if (!player) return;
@@ -377,6 +382,13 @@ export function eliminateCollectiveListPlayer(
 
   console.log(`❌ ${player.name} eliminated (${reason}). ${bonusRound.activePlayers.length} players remaining.`);
 
+  const roomCode = room.code;
+  
+  // Delay hängt davon ab ob gestaffeltes Reveal (wrong) oder sofortiges (timeout/skip)
+  const feedbackDelay = reason === 'wrong' 
+    ? COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY 
+    : COLLECTIVE_LIST_TIMING.INSTANT_FEEDBACK_DELAY;
+
   // Check if game should end
   // In Single-Player mode (only 1 player at start), continue until wrong/skip
   // In Multi-Player mode, end when only 1 player remains (winner)
@@ -391,7 +403,7 @@ export function eliminateCollectiveListPlayer(
       if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
         endCollectiveListRound(currentRoom, io, 'last_standing');
       }
-    }, COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY);
+    }, feedbackDelay);
     return;
   } else if (wasSinglePlayer && bonusRound.activePlayers.length === 0) {
     // Single-Player: Player eliminated themselves (wrong answer or skip) - mit Delay für Reveal-Animation
@@ -402,7 +414,7 @@ export function eliminateCollectiveListPlayer(
       if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
         endCollectiveListRound(currentRoom, io, 'last_standing');
       }
-    }, COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY);
+    }, feedbackDelay);
     return;
   }
 
@@ -415,14 +427,13 @@ export function eliminateCollectiveListPlayer(
   broadcastRoomUpdate(room, io);
 
   // Small delay before next turn
-  const roomCode = room.code;
   setTimeout(() => {
     const { getRoom } = require('../roomStore');
     const currentRoom = getRoom(roomCode);
     if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'playing') {
       startCollectiveListTurn(currentRoom, io);
     }
-  }, COLLECTIVE_LIST_TIMING.ELIMINATION_DELAY);
+  }, feedbackDelay);
 }
 
 // ============================================

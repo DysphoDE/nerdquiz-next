@@ -138,8 +138,11 @@ export const COLLECTIVE_LIST_TIMING = {
   /** Delay nach richtiger Antwort (Feedback + kleiner Buffer) */
   CORRECT_ANSWER_DELAY: 2800,
   
-  /** Delay nach Elimination (Feedback + kleiner Buffer) */
+  /** Delay nach Elimination durch falsche Antwort (volles gestaffeltes Reveal + Buffer) */
   ELIMINATION_DELAY: 2800,
+  
+  /** Delay nach Timeout/Skip (sofortiges Reveal, nur Phase 3 + Buffer) */
+  INSTANT_FEEDBACK_DELAY: 1400,
   
   /** Finale Auswertung (8s) */
   FINAL_RESULTS: 8000,

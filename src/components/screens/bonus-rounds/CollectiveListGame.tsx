@@ -92,6 +92,14 @@ function TurnIndicatorWithFuse({
     if (lastFeedbackRef.current === feedbackId) return;
     lastFeedbackRef.current = feedbackId;
     
+    // Bei Timeout/Skip: Direkt zur Auflösung (kein "sagt:" Spannungsbogen nötig)
+    const isInstantReveal = answerFeedback.result === 'timeout' || answerFeedback.result === 'skip';
+    
+    if (isInstantReveal) {
+      setRevealPhase('revealed');
+      return;
+    }
+    
     // Phase 1: "NAME sagt:" (sofort)
     setRevealPhase('pending');
     
@@ -211,55 +219,67 @@ function TurnIndicatorWithFuse({
               
               {/* Feedback Text - gestaffelt, zentriert */}
               <div className="text-center">
-                {/* Phase 1+: "NAME sagt:" */}
+                {/* Überschrift: "NAME sagt:" bei normaler Antwort, anderer Text bei Timeout/Skip */}
                 <p className={cn(
                   'font-bold text-lg sm:text-xl transition-colors duration-300',
                   getTextColor(answerFeedback.result, revealPhase)
                 )}>
-                  {answerFeedback.playerName} sagt:
+                  {answerFeedback.result === 'timeout' 
+                    ? answerFeedback.playerName
+                    : answerFeedback.result === 'skip'
+                      ? answerFeedback.playerName
+                      : `${answerFeedback.playerName} sagt:`}
                 </p>
                 
-                {/* Phase 2+: Begriff zeigen */}
+                {/* Phase 2+: Begriff / Status zeigen */}
                 <div className="h-8 flex items-center justify-center">
-                  {revealPhase !== 'pending' && (
+                  {/* Timeout/Skip: Sofort Status zeigen (kein gestaffeltes Reveal) */}
+                  {(answerFeedback.result === 'timeout' || answerFeedback.result === 'skip') && (
                     <motion.p
-                      key={revealPhase === 'revealed' && answerFeedback.result === 'correct' && answerFeedback.matchedDisplay ? 'corrected' : 'original'}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={cn(
-                        'font-black text-xl sm:text-2xl transition-colors duration-300',
-                        getTextColor(answerFeedback.result, revealPhase)
-                      )}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="font-black text-xl sm:text-2xl text-red-400"
                     >
-                      {answerFeedback.result === 'timeout' ? (
-                        '...'
-                      ) : answerFeedback.result === 'skip' ? (
-                        <span className="italic font-normal text-muted-foreground">nichts</span>
-                      ) : (
-                        // Phase 2 (showing): Zeige was getippt wurde
-                        // Phase 3 (revealed) + correct: Zeige den echten Begriff (falls anders)
-                        `"${revealPhase === 'revealed' && answerFeedback.result === 'correct' && answerFeedback.matchedDisplay 
-                          ? answerFeedback.matchedDisplay 
-                          : answerFeedback.input}"`
-                      )}
+                      {answerFeedback.result === 'timeout' ? '⏰ Zu langsam!' : '⏭ Gepasst!'}
                     </motion.p>
                   )}
-                  {/* Lade-Punkte während Phase 1 */}
-                  {revealPhase === 'pending' && (
-                    <motion.span
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{ repeat: Infinity, duration: 1 }}
-                      className="text-xl text-muted-foreground"
-                    >
-                      ...
-                    </motion.span>
+                  
+                  {/* Normale Antwort: Gestaffeltes Reveal */}
+                  {answerFeedback.result !== 'timeout' && answerFeedback.result !== 'skip' && (
+                    <>
+                      {revealPhase !== 'pending' && (
+                        <motion.p
+                          key={revealPhase === 'revealed' && answerFeedback.result === 'correct' && answerFeedback.matchedDisplay ? 'corrected' : 'original'}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={cn(
+                            'font-black text-xl sm:text-2xl transition-colors duration-300',
+                            getTextColor(answerFeedback.result, revealPhase)
+                          )}
+                        >
+                          {`"${revealPhase === 'revealed' && answerFeedback.result === 'correct' && answerFeedback.matchedDisplay 
+                            ? answerFeedback.matchedDisplay 
+                            : answerFeedback.input}"`}
+                        </motion.p>
+                      )}
+                      {/* Lade-Punkte während Phase 1 */}
+                      {revealPhase === 'pending' && (
+                        <motion.span
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                          className="text-xl text-muted-foreground"
+                        >
+                          ...
+                        </motion.span>
+                      )}
+                    </>
                   )}
                 </div>
                 
-                {/* Phase 3: Status-Text */}
+                {/* Phase 3: Status-Text (nur bei normaler Antwort, Timeout/Skip haben es oben) */}
                 <div className="h-6 flex items-center justify-center">
                   <AnimatePresence>
-                    {revealPhase === 'revealed' && (
+                    {revealPhase === 'revealed' && answerFeedback.result !== 'timeout' && answerFeedback.result !== 'skip' && (
                       <motion.p
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -270,9 +290,7 @@ function TurnIndicatorWithFuse({
                         )}
                       >
                         {answerFeedback.result === 'correct' ? '✓ Richtig!' : 
-                         answerFeedback.result === 'already_guessed' ? '⚠ Bereits genannt!' : 
-                         answerFeedback.result === 'timeout' ? '⏰ Zeit abgelaufen!' :
-                         answerFeedback.result === 'skip' ? '⏭ Gepasst!' : '✗ Falsch!'}
+                         answerFeedback.result === 'already_guessed' ? '⚠ Bereits genannt!' : '✗ Falsch!'}
                       </motion.p>
                     )}
                   </AnimatePresence>
@@ -489,8 +507,24 @@ export function CollectiveListGame() {
 
   // Clear answer popup after delay und synchronisiere Grid-Reveal-Phase
   const FEEDBACK_TOTAL_MS = REVEAL_TIMINGS.PHASE_1 + REVEAL_TIMINGS.PHASE_2 + REVEAL_TIMINGS.PHASE_3;
+  const INSTANT_FEEDBACK_MS = REVEAL_TIMINGS.PHASE_3; // Timeout/Skip: nur Phase 3 Dauer
   useEffect(() => {
     if (answerPopup) {
+      const isInstantReveal = answerPopup.result === 'timeout' || answerPopup.result === 'skip';
+      
+      if (isInstantReveal) {
+        // Bei Timeout/Skip: Sofort revealed, kürzere Anzeigedauer
+        setGridRevealPhase('revealed');
+        
+        const timer = setTimeout(() => {
+          setAnswerPopup(null);
+          setGridRevealPhase('pending');
+        }, INSTANT_FEEDBACK_MS);
+        
+        return () => clearTimeout(timer);
+      }
+      
+      // Normale Antwort: Gestaffeltes Reveal
       // Phase 1: pending (sofort)
       setGridRevealPhase('pending');
       
