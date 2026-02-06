@@ -233,13 +233,16 @@ export function QuestionScreen() {
   // TTS: Frage vorlesen wenn sie erscheint
   useEffect(() => {
     if (room?.phase === 'question' && question?.text) {
-      playTTS(question.text, { instructionKey: 'QUESTION' });
+      playTTS(question.text, {
+        instructionKey: 'QUESTION',
+        questionId: question.id,
+      });
     }
     // TTS stoppen wenn Reveal beginnt
     if (room?.phase === 'revealing') {
       stopTTS();
     }
-  }, [room?.phase, room?.currentQuestionIndex, question?.text, playTTS, stopTTS]);
+  }, [room?.phase, room?.currentQuestionIndex, question?.text, question?.id, playTTS, stopTTS]);
 
   // Play correct/wrong SFX + Moderator snippet when answer is revealed
   useEffect(() => {

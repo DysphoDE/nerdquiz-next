@@ -12,6 +12,7 @@ import {
   TTS_CONFIG,
   TTS_INSTRUCTIONS,
   TTS_API,
+  TTS_VOLUME_GAIN,
   type TtsVoice,
   type TtsModel,
   type TtsInstructionKey,
@@ -41,6 +42,8 @@ export interface PlayTTSOptions {
   instructionKey?: TtsInstructionKey;
   /** Sprechgeschwindigkeit 0.25 - 4.0 (default: 1.0) */
   speed?: number;
+  /** Frage-ID für serverseitiges Caching (spart API-Kosten bei Wiederholung) */
+  questionId?: string;
   /** Callback wenn die Wiedergabe fertig ist */
   onEnd?: () => void;
   /** Callback bei Fehler */
@@ -76,10 +79,10 @@ class AudioManager {
   private ttsLoading = false;
 
   // Volume state (synced from audioStore via useAudio hook)
-  private masterVolume = 0.7;
-  private musicVolume = 0.5;
-  private sfxVolume = 0.8;
-  private ttsVolume = 0.9;
+  private masterVolume = 0.5;
+  private musicVolume = 0.1;
+  private sfxVolume = 0.65;
+  private ttsVolume = 0.4;
 
   // Track failed loads to avoid repeated attempts
   private failedLoads: Set<string> = new Set();
@@ -231,12 +234,12 @@ class AudioManager {
   }
 
   // ============================================
-  // TTS (Text-to-Speech via OpenAI)
+  // TTS (Text-to-Speech via /api/tts)
   // ============================================
 
   /**
-   * Generiert und spielt TTS-Audio über die OpenAI API.
-   * Ruft /api/tts auf, empfängt Audio-Daten und spielt sie über Howler ab.
+   * Generiert und spielt TTS-Audio über die /api/tts Route.
+   * Der Provider (OpenAI oder ElevenLabs) wird serverseitig über TTS_PROVIDER gesteuert.
    * 
    * @param text - Der vorzulesende Text
    * @param options - Optionale TTS-Konfiguration (Stimme, Modell, Instructions etc.)
@@ -249,6 +252,7 @@ class AudioManager {
       instructions,
       instructionKey,
       speed,
+      questionId,
       onEnd,
       onError,
     } = options;
@@ -273,6 +277,7 @@ class AudioManager {
       if (instructions) body.instructions = instructions;
       if (instructionKey) body.instructionKey = instructionKey;
       if (speed !== undefined) body.speed = speed;
+      if (questionId) body.questionId = questionId;
 
       // Fetch audio from API route
       const response = await fetch(TTS_API.ENDPOINT, {
@@ -298,7 +303,7 @@ class AudioManager {
         const howl = new Howl({
           src: [audioUrl],
           format: [TTS_CONFIG.OUTPUT_FORMAT],
-          volume: this.masterVolume * this.ttsVolume,
+          volume: this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.API_TTS,
           html5: true,
           onend: () => {
             this.cleanupTTS(audioUrl);
@@ -409,7 +414,7 @@ class AudioManager {
     if (!howl) {
       howl = new Howl({
         src: [src],
-        volume: this.masterVolume * this.ttsVolume,
+        volume: this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS,
         preload: true,
         onloaderror: (_id, error) => {
           console.warn(`[AudioManager] Failed to load snippet "${src}":`, error);
@@ -421,7 +426,7 @@ class AudioManager {
     }
 
     // Update volume before playing (in case it changed)
-    howl.volume(this.masterVolume * this.ttsVolume);
+    howl.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS);
     howl.play();
   }
 
@@ -461,7 +466,7 @@ class AudioManager {
     this.updateMusicVolume();
     // Update active TTS playback volume
     if (this.currentTTS && this.currentTTS.playing()) {
-      this.currentTTS.volume(this.masterVolume * this.ttsVolume);
+      this.currentTTS.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.API_TTS);
     }
     // SFX volume is set per-play, no need to update existing instances
   }
@@ -489,7 +494,7 @@ class AudioManager {
     this.ttsVolume = volume;
     // Update active TTS playback volume
     if (this.currentTTS && this.currentTTS.playing()) {
-      this.currentTTS.volume(this.masterVolume * this.ttsVolume);
+      this.currentTTS.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.API_TTS);
     }
   }
 

@@ -48,3 +48,6 @@ project.ini
 thumbnail.png
 
 .agents
+
+# TTS cache (generierte Sprachdateien pro Frage)
+/public/audio/tts-cache

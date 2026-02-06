@@ -2,11 +2,35 @@
  * TTS (Text-to-Speech) Constants
  * 
  * Konfiguration für die KI-gestützte Sprachsynthese im Nerdquiz.
- * Verwendet OpenAI TTS über das Vercel AI SDK.
+ * Unterstützt OpenAI TTS und ElevenLabs als Provider.
+ * Der aktive Provider wird über TTS_PROVIDER gesteuert.
  */
 
 // ============================================
-// AVAILABLE VOICES
+// TTS PROVIDER
+// ============================================
+
+/**
+ * Verfügbare TTS-Provider
+ */
+export const TTS_PROVIDERS = {
+  OPENAI: 'openai',
+  ELEVENLABS: 'elevenlabs',
+} as const;
+
+export type TtsProvider = typeof TTS_PROVIDERS[keyof typeof TTS_PROVIDERS];
+
+/**
+ * ⚡ AKTIVER TTS-PROVIDER
+ * 
+ * Hier umschalten welcher Provider für die Sprachsynthese genutzt wird:
+ * - 'openai'     → OpenAI TTS (gpt-4o-mini-tts, tts-1, tts-1-hd)
+ * - 'elevenlabs' → ElevenLabs TTS (eleven_multilingual_v2 etc.)
+ */
+export const TTS_PROVIDER: TtsProvider = TTS_PROVIDERS.ELEVENLABS;
+
+// ============================================
+// OPENAI VOICES
 // ============================================
 
 /**
@@ -43,7 +67,7 @@ export const TTS_VOICES = {
 export type TtsVoice = typeof TTS_VOICES[keyof typeof TTS_VOICES];
 
 // ============================================
-// AVAILABLE MODELS
+// OPENAI MODELS
 // ============================================
 
 /**
@@ -62,11 +86,62 @@ export const TTS_MODELS = {
 export type TtsModel = typeof TTS_MODELS[keyof typeof TTS_MODELS];
 
 // ============================================
-// TTS CONFIGURATION
+// ELEVENLABS CONFIGURATION
 // ============================================
 
 /**
- * Standard TTS-Konfiguration für das Nerdquiz
+ * ElevenLabs TTS Modelle
+ * 
+ * - eleven_multilingual_v2: Bestes multilinguales Modell, unterstützt Deutsch
+ * - eleven_turbo_v2_5: Schneller, niedrigere Latenz
+ */
+export const ELEVENLABS_MODELS = {
+  MULTILINGUAL_V2: 'eleven_multilingual_v2',
+  TURBO_V2_5: 'eleven_turbo_v2_5',
+} as const;
+
+export type ElevenLabsModel = typeof ELEVENLABS_MODELS[keyof typeof ELEVENLABS_MODELS];
+
+/**
+ * ElevenLabs Voice-Konfiguration
+ */
+export const ELEVENLABS_CONFIG = {
+  /** API Base URL */
+  API_BASE_URL: 'https://api.elevenlabs.io',
+
+  /** Voice ID für die Quizmaster-Stimme */
+  VOICE_ID: 'DQ4rTqXxHr077oQgsA9D',
+
+  /** Standard-Modell */
+  DEFAULT_MODEL: ELEVENLABS_MODELS.MULTILINGUAL_V2 as ElevenLabsModel,
+
+  /** Ausgabeformat (mp3_44100_128 = gute Qualität) */
+  OUTPUT_FORMAT: 'mp3_44100_128' as const,
+
+  /** Sprache (ISO 639-1) */
+  LANGUAGE_CODE: 'de',
+
+  /** Voice Settings */
+  VOICE_SETTINGS: {
+    /** Stabilität (0-1): Höher = stabiler, weniger emotional */
+    stability: 0.5,
+    /** Similarity Boost (0-1): Höher = näher am Original */
+    similarity_boost: 0.75,
+    /** Style (0-1): Höher = mehr Stil-Übertreibung (kostet Latenz) */
+    style: 0.0,
+    /** Speaker Boost: Verstärkt Ähnlichkeit zum Original */
+    use_speaker_boost: true,
+    /** Sprechgeschwindigkeit (0.7 - 1.2) */
+    speed: 1.0,
+  },
+} as const;
+
+// ============================================
+// SHARED TTS CONFIGURATION
+// ============================================
+
+/**
+ * Standard TTS-Konfiguration für das Nerdquiz (OpenAI-Defaults)
  */
 export const TTS_CONFIG = {
   /** Standard-Modell (gpt-4o-mini-tts für Instructions-Support) */
@@ -92,6 +167,27 @@ export const TTS_CONFIG = {
   
   /** Maximale Retries bei Fehlern */
   MAX_RETRIES: 2,
+} as const;
+
+// ============================================
+// VOLUME NORMALIZATION
+// ============================================
+
+/**
+ * Lautstärke-Gain-Faktoren zur Normalisierung zwischen verschiedenen Audio-Quellen.
+ * 
+ * Da API-generiertes TTS-Audio (OpenAI/ElevenLabs) und vorproduzierte
+ * Moderator-Snippets unterschiedliche Quell-Lautstärken haben können,
+ * werden diese Multiplikatoren auf den jeweiligen ttsVolume-Kanal angewendet.
+ * 
+ * Wert 1.0 = keine Änderung, <1.0 = leiser, >1.0 = lauter
+ * Einfach anpassen bis beide Quellen gleich laut klingen.
+ */
+export const TTS_VOLUME_GAIN = {
+  /** Gain für API-generiertes TTS-Audio (OpenAI / ElevenLabs) */
+  API_TTS: 1.1,
+  /** Gain für vorproduzierte Moderator-Snippet-MP3s */
+  SNIPPETS: 0.6,
 } as const;
 
 // ============================================
@@ -149,7 +245,31 @@ export const TTS_API = {
 } as const;
 
 // ============================================
-// HELPER TYPE
+// TTS CACHE
+// ============================================
+
+/**
+ * TTS-Cache-Konfiguration
+ * 
+ * Einmal generierte TTS-Audiodateien werden pro Frage-ID auf dem Server
+ * gespeichert. Bei erneutem Abspielen wird die gecachte Datei ausgeliefert
+ * statt einen neuen API-Call zu machen. Spart massiv Kosten!
+ * 
+ * Cache-Pfad: public/audio/tts-cache/{questionId}.mp3
+ */
+export const TTS_CACHE = {
+  /** Cache aktivieren/deaktivieren */
+  ENABLED: true,
+  
+  /** Verzeichnis relativ zum Projekt-Root (für serverseitiges Lesen/Schreiben) */
+  DIR: 'public/audio/tts-cache',
+  
+  /** URL-Prefix für den Client (zum direkten Abrufen gecachter Dateien) */
+  PUBLIC_URL_PREFIX: '/audio/tts-cache',
+} as const;
+
+// ============================================
+// HELPER TYPES
 // ============================================
 
 /**
@@ -158,5 +278,7 @@ export const TTS_API = {
 export type TtsConstant =
   | TtsVoice
   | TtsModel
+  | ElevenLabsModel
+  | TtsProvider
   | typeof TTS_CONFIG[keyof typeof TTS_CONFIG]
   | TtsInstructionKey;

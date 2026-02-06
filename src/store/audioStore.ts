@@ -32,10 +32,10 @@ interface AudioActions {
 export type AudioStore = AudioState & AudioActions;
 
 const DEFAULT_STATE: AudioState = {
-  masterVolume: 0.7,
-  musicVolume: 0.5,
-  sfxVolume: 0.8,
-  ttsVolume: 0.9,
+  masterVolume: 0.5,
+  musicVolume: 0.1,
+  sfxVolume: 0.65,
+  ttsVolume: 0.4,
   isMuted: false,
 };
 
