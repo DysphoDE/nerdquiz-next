@@ -396,7 +396,7 @@ export function LobbyScreen() {
   const playerId = useGameStore((s) => s.playerId);
   const isHost = useIsHost();
   const { isDevMode, activateDevMode } = useDevMode();
-  const { playMusic, playModeratorSnippet } = useAudio();
+  const { playMusic } = useAudio();
 
   // Play lobby music when entering the lobby
   useEffect(() => {
@@ -552,11 +552,10 @@ export function LobbyScreen() {
     setStarting(true);
     setError(null);
     const result = await startGame();
-    if (result.success) {
-      playModeratorSnippet('welcome');
-    } else {
+    if (!result.success) {
       setError(result.error || 'Fehler');
     }
+    // Welcome-TTS wird jetzt in page.tsx für ALLE Spieler abgespielt
     setStarting(false);
   };
 

@@ -185,9 +185,9 @@ export const TTS_CONFIG = {
  */
 export const TTS_VOLUME_GAIN = {
   /** Gain für API-generiertes TTS-Audio (OpenAI / ElevenLabs) */
-  API_TTS: 1.1,
+  API_TTS: 1.0,
   /** Gain für vorproduzierte Moderator-Snippet-MP3s */
-  SNIPPETS: 0.6,
+  SNIPPETS: 1.0,
 } as const;
 
 // ============================================

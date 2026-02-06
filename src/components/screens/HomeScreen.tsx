@@ -57,7 +57,7 @@ import Image from 'next/image';
 // --- DATA ---
 
 const CATEGORIES = [
-  { name: 'Gaming', icon: Gamepad2, color: 'from-violet-500 to-purple-600' },
+  { name: 'Gaming', icon: Gamepad2, color: 'from-emerald-500 to-teal-600' },
   { name: 'Filme & Serien', icon: Film, color: 'from-red-500 to-rose-600' },
   { name: 'Anime & Manga', icon: Sparkles, color: 'from-pink-400 to-rose-500' },
   { name: 'Star Wars', icon: Swords, color: 'from-yellow-400 to-orange-500' },
@@ -67,7 +67,7 @@ const CATEGORIES = [
   { name: 'Musik', icon: Music, color: 'from-cyan-400 to-blue-500' },
   { name: 'Wissenschaft', icon: Beaker, color: 'from-emerald-400 to-teal-600' },
   { name: 'Technik', icon: Smartphone, color: 'from-slate-400 to-slate-600' },
-  { name: 'Allgemeinwissen', icon: Brain, color: 'from-blue-500 to-indigo-600' },
+  { name: 'Allgemeinwissen', icon: Brain, color: 'from-blue-500 to-cyan-600' },
   { name: 'Mythologie', icon: Book, color: 'from-orange-300 to-amber-500' },
   { name: 'Fahrzeuge', icon: Car, color: 'from-orange-400 to-red-500' },
   { name: 'Sport', icon: Dumbbell, color: 'from-green-500 to-emerald-600' },
@@ -86,7 +86,7 @@ const FEATURES = [
     title: "17 Kategorien",
     desc: "Von Allgemeinwissen bis Nerd-Spezialwissen.",
     icon: Brain,
-    color: "bg-purple-500/10 text-purple-500"
+    color: "bg-teal-500/10 text-teal-500"
   },
   {
     title: "Bonus Runden",
@@ -145,7 +145,7 @@ function GridBackground() {
   return (
     <div className="absolute inset-0 -z-10 overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]"></div>
-      <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-violet-500/10 via-transparent to-transparent blur-3xl" />
+      <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent blur-3xl" />
       <div className="absolute bottom-0 left-0 right-0 h-[300px] bg-gradient-to-t from-background to-transparent" />
     </div>
   );
@@ -220,7 +220,7 @@ export function HomeScreen() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && name.trim() && handleCreate()}
-          className="bg-zinc-900 border-zinc-800 h-12 text-lg focus-visible:ring-violet-500"
+          className="bg-zinc-900 border-zinc-800 h-12 text-lg focus-visible:ring-emerald-500"
           autoFocus={isDesktop}
         />
       </div>
@@ -228,7 +228,7 @@ export function HomeScreen() {
       {error && <p className="text-sm text-red-400 bg-red-400/10 p-2 rounded">{error}</p>}
 
       <Button
-        className="w-full h-12 text-lg font-bold bg-violet-600 hover:bg-violet-500"
+        className="w-full h-12 text-lg font-bold bg-emerald-600 hover:bg-emerald-500"
         onClick={handleCreate}
         disabled={loading || !name.trim()}
       >
@@ -284,10 +284,10 @@ export function HomeScreen() {
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-background/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-cyan-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <Brain className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight">Nerd<span className="text-violet-400">Battle</span></span>
+            <span className="font-bold text-lg tracking-tight">Nerd<span className="text-emerald-400">Battle</span></span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -331,7 +331,7 @@ export function HomeScreen() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-sm font-medium"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-sm font-medium"
           >
             <Sparkles className="w-4 h-4" />
             <span>Jetzt mit neuen Bonus Runden!</span>
@@ -344,7 +344,7 @@ export function HomeScreen() {
             className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight leading-[0.9]"
           >
             Das ultimative <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-400">
               Nerd Battle
             </span>
           </motion.h1>
@@ -368,7 +368,7 @@ export function HomeScreen() {
           >
             <Button
               size="lg"
-              className="h-14 px-8 text-lg rounded-2xl bg-violet-600 hover:bg-violet-500 text-white shadow-xl shadow-violet-600/20 w-full sm:w-auto transition-transform hover:scale-105"
+              className="h-14 px-8 text-lg rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-600/20 w-full sm:w-auto transition-transform hover:scale-105"
               onClick={() => setDialogMode('create')}
               disabled={!isConnected}
             >
@@ -446,7 +446,7 @@ export function HomeScreen() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row gap-4 items-end justify-between mb-12">
             <div>
-              <span className="text-sm font-bold text-violet-400 uppercase tracking-widest mb-2 block">New Features</span>
+              <span className="text-sm font-bold text-emerald-400 uppercase tracking-widest mb-2 block">New Features</span>
               <h2 className="text-4xl md:text-5xl font-bold">Bonus Rounds</h2>
             </div>
             <p className="text-muted-foreground max-w-md text-right hidden md:block">
@@ -549,7 +549,7 @@ export function HomeScreen() {
             <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-xl">
-                  <Zap className="w-5 h-5 text-violet-500" />
+                  <Zap className="w-5 h-5 text-emerald-500" />
                   Lobby erstellen
                 </DialogTitle>
                 <DialogDescription>
@@ -581,7 +581,7 @@ export function HomeScreen() {
             <DrawerContent className="bg-zinc-950 border-zinc-800 text-white">
               <DrawerHeader className="text-left">
                 <DrawerTitle className="flex items-center gap-2 text-xl">
-                  <Zap className="w-5 h-5 text-violet-500" />
+                  <Zap className="w-5 h-5 text-emerald-500" />
                   Lobby erstellen
                 </DrawerTitle>
                 <DrawerDescription>
