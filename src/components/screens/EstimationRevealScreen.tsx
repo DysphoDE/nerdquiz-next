@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
+import { useAudio } from '@/hooks/useAudio';
 
 // Lustige Sprüche basierend auf Abweichung (Prozent vom korrekten Wert)
 // Mehrere Varianten pro Kategorie für Abwechslung
@@ -150,6 +151,7 @@ export function EstimationRevealScreen() {
   const { room, lastResults } = useGameStore();
   const isHost = useIsHost();
   const myResult = useMyResult();
+  const { playSfx } = useAudio();
   
   // Animation states
   const [phase, setPhase] = useState<'counting' | 'revealing' | 'done'>('counting');

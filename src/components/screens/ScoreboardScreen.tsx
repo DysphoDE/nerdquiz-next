@@ -16,8 +16,9 @@ import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, useIsHost, usePlayers } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
+import { useAudio } from '@/hooks/useAudio';
 
 // Rank colors and styling
 const RANK_CONFIG = [
@@ -64,6 +65,12 @@ export function ScoreboardScreen() {
   const { room } = useGameStore();
   const isHost = useIsHost();
   const unsortedPlayers = usePlayers();
+  const { playMusic } = useAudio();
+
+  // Play scoreboard music when entering
+  useEffect(() => {
+    playMusic('scoreboard');
+  }, [playMusic]);
   
   // Sort and calculate rank changes
   const players: PlayerWithRankChange[] = useMemo(() => {

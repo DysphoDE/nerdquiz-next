@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Leaderboard, useGameTimer } from '@/components/game';
 import { GameAvatar, getMoodForContext, type AvatarMood } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { useAudio } from '@/hooks/useAudio';
 import type { AnswerResult, Player } from '@/types/game';
 
 const ANSWER_COLORS = [
@@ -34,6 +35,7 @@ export function QuestionScreen() {
   const players = usePlayers();
   const currentPlayer = useCurrentPlayer();
   const isHost = useIsHost();
+  const { playMusic, playSfx, playTTS, stopTTS, playModeratorSnippet } = useAudio();
   const myResult = useMyResult();
   
   const [revealPhase, setRevealPhase] = useState<RevealPhase>('answering');
@@ -221,6 +223,32 @@ export function QuestionScreen() {
     return () => clearTimeout(timer);
   }, [revealPhase, isHost, next]);
 
+  // Play music when question starts
+  useEffect(() => {
+    if (room?.phase === 'question') {
+      playMusic('question');
+    }
+  }, [room?.phase, room?.currentQuestionIndex, playMusic]);
+
+  // TTS: Frage vorlesen wenn sie erscheint
+  useEffect(() => {
+    if (room?.phase === 'question' && question?.text) {
+      playTTS(question.text, { instructionKey: 'QUESTION' });
+    }
+    // TTS stoppen wenn Reveal beginnt
+    if (room?.phase === 'revealing') {
+      stopTTS();
+    }
+  }, [room?.phase, room?.currentQuestionIndex, question?.text, playTTS, stopTTS]);
+
+  // Play correct/wrong SFX + Moderator snippet when answer is revealed
+  useEffect(() => {
+    if (revealPhase === 'revealing' && myResult) {
+      playSfx(myResult.correct ? 'correct' : 'wrong');
+      playModeratorSnippet(myResult.correct ? 'correct' : 'wrong');
+    }
+  }, [revealPhase, myResult, playSfx, playModeratorSnippet]);
+
   // Reset on new question
   useEffect(() => {
     if (room?.phase === 'question') {
@@ -234,6 +262,7 @@ export function QuestionScreen() {
     if (!room || hasSubmitted || isRevealing) return;
     setSelectedAnswer(index);
     setHasSubmitted(true);
+    playSfx('buzz');
     submitAnswer(index);
   };
 

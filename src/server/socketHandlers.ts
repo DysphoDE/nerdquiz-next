@@ -131,8 +131,8 @@ export function setupSocketHandlers(io: SocketServer): void {
     socket.on('submit_estimation', handleSubmitEstimation(io));
 
     // === BONUS ROUND ===
-    socket.on('bonus_round_submit', handleBonusRoundSubmit(io));
-    socket.on('bonus_round_skip', handleBonusRoundSkipEvent(io));
+    socket.on('collective_list_submit', handleCollectiveListSubmit(io));
+    socket.on('collective_list_skip', handleCollectiveListSkipEvent(io));
     socket.on('hot_button_buzz', handleHotButtonBuzz(io));
     socket.on('hot_button_submit', handleHotButtonSubmit(io));
 
@@ -452,26 +452,23 @@ function handleSubmitEstimation(io: SocketServer) {
   };
 }
 
-function handleBonusRoundSubmit(io: SocketServer) {
+function handleCollectiveListSubmit(io: SocketServer) {
   return (data: { roomCode: string; playerId: string; answer: string }) => {
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
 
     const bonusRound = room.state.bonusRound;
-    if (!bonusRound) return;
+    if (!bonusRound || bonusRound.type !== 'collective_list') return;
 
-    // Collective List: Only current turn player can answer
-    if (bonusRound.type === 'collective_list') {
-      if (bonusRound.phase !== 'playing') return;
-      const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
-      if (data.playerId !== currentPlayerId) return;
-    }
+    if (bonusRound.phase !== 'playing') return;
+    const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
+    if (data.playerId !== currentPlayerId) return;
 
     handleBonusRoundAnswer(room, io, data.playerId, data.answer);
   };
 }
 
-function handleBonusRoundSkipEvent(io: SocketServer) {
+function handleCollectiveListSkipEvent(io: SocketServer) {
   return (data: { roomCode: string; playerId: string }) => {
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
@@ -1177,22 +1174,20 @@ function setupBotHandlers(io: SocketServer) {
     finalizeRPSDuelPick(room, io, data.categoryId);
   });
 
-  botManager.registerActionHandler('bonus_round_submit', (data) => {
+  botManager.registerActionHandler('collective_list_submit', (data) => {
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
     const bonusRound = room.state.bonusRound;
-    if (!bonusRound) return;
+    if (!bonusRound || bonusRound.type !== 'collective_list') return;
 
-    if (bonusRound.type === 'collective_list') {
-      if (bonusRound.phase !== 'playing') return;
-      const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
-      if (data.playerId !== currentPlayerId) return;
-    }
+    if (bonusRound.phase !== 'playing') return;
+    const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
+    if (data.playerId !== currentPlayerId) return;
 
     handleBonusRoundAnswer(room, io, data.playerId, data.answer);
   });
 
-  botManager.registerActionHandler('bonus_round_skip', (data) => {
+  botManager.registerActionHandler('collective_list_skip', (data) => {
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
     const bonusRound = room.state.bonusRound;

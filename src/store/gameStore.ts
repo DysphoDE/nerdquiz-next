@@ -5,8 +5,8 @@
 import { create } from 'zustand';
 import type { RoomState, AnswerResult, FinalRanking, Player, GameStatistics } from '@/types/game';
 
-// Bonus Round End Result (Collective List)
-export interface BonusRoundPlayerScore {
+// Collective List End Result
+export interface CollectiveListPlayerScore {
   playerId: string;
   playerName: string;
   avatarSeed: string;
@@ -17,14 +17,14 @@ export interface BonusRoundPlayerScore {
   rank: number;
 }
 
-export interface BonusRoundEndResult {
+export interface CollectiveListEndResult {
   reason: 'last_standing' | 'all_guessed';
   winners: Array<{ playerId: string; playerName: string; avatarSeed: string }>;
   winnerBonus: number;
   pointsPerCorrect: number;
   totalRevealed: number;
   totalItems: number;
-  playerScoreBreakdown: BonusRoundPlayerScore[];
+  playerScoreBreakdown: CollectiveListPlayerScore[];
 }
 
 // Hot Button Events
@@ -68,7 +68,7 @@ interface GameStore {
   lastResults: AnswerResult[] | null;
   finalRankings: FinalRanking[] | null;
   gameStatistics: GameStatistics | null;
-  bonusRoundResult: BonusRoundEndResult | null;
+  collectiveListResult: CollectiveListEndResult | null;
   
   // Hot Button specific state
   hotButtonBuzz: HotButtonBuzzEvent | null;
@@ -84,7 +84,7 @@ interface GameStore {
   setLastResults: (results: AnswerResult[] | null) => void;
   setFinalRankings: (rankings: FinalRanking[] | null) => void;
   setGameStatistics: (stats: GameStatistics | null) => void;
-  setBonusRoundResult: (result: BonusRoundEndResult | null) => void;
+  setCollectiveListResult: (result: CollectiveListEndResult | null) => void;
   setHotButtonBuzz: (buzz: HotButtonBuzzEvent | null) => void;
   setHotButtonEndResult: (result: HotButtonEndResult | null) => void;
   
@@ -104,7 +104,7 @@ const initialState = {
   lastResults: null as AnswerResult[] | null,
   finalRankings: null as FinalRanking[] | null,
   gameStatistics: null as GameStatistics | null,
-  bonusRoundResult: null as BonusRoundEndResult | null,
+  collectiveListResult: null as CollectiveListEndResult | null,
   hotButtonBuzz: null as HotButtonBuzzEvent | null,
   hotButtonEndResult: null as HotButtonEndResult | null,
 };
@@ -130,7 +130,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   setGameStatistics: (stats) => set({ gameStatistics: stats }),
   
-  setBonusRoundResult: (result) => set({ bonusRoundResult: result }),
+  setCollectiveListResult: (result) => set({ collectiveListResult: result }),
   
   setHotButtonBuzz: (buzz) => set({ hotButtonBuzz: buzz }),
   

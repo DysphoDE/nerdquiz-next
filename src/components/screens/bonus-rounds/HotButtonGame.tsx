@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Leaderboard, GameTimer, useGameTimer } from '@/components/game';
 import { GameAvatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { useAudio } from '@/hooks/useAudio';
 import type { HotButtonBonusRound, HotButtonQuestionResult } from '@/types/game';
 
 /**
@@ -355,10 +356,16 @@ export function HotButtonGame() {
   const { buzzHotButton, submitHotButtonAnswer } = useSocket();
   const { room, playerId, hotButtonBuzz, hotButtonEndResult } = useGameStore();
   const players = usePlayers();
+  const { playMusic, playSfx } = useAudio();
 
   const [inputValue, setInputValue] = useState('');
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Play hot button music when entering
+  useEffect(() => {
+    playMusic('hotButton');
+  }, [playMusic]);
 
   // Determine which timer to use based on phase
   const hotButton = room?.bonusRound as HotButtonBonusRound | null;
@@ -386,8 +393,9 @@ export function HotButtonGame() {
   // Buzz handler (memoized for dependency array)
   const handleBuzz = useCallback(() => {
     if (!canBuzz) return;
+    playSfx('buzz');
     buzzHotButton();
-  }, [canBuzz, buzzHotButton]);
+  }, [canBuzz, buzzHotButton, playSfx]);
 
   // Keyboard shortcut - Space to buzz
   useEffect(() => {

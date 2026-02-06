@@ -7,6 +7,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { getSocket } from '@/lib/socket';
 import { useGameStore, useIsHost } from '@/store/gameStore';
 import { useDevMode } from '@/hooks/useDevMode';
+import { useAudio } from '@/hooks/useAudio';
 import { Button } from '@/components/ui/button';
 import { 
   Copy, 
@@ -395,6 +396,13 @@ export function LobbyScreen() {
   const playerId = useGameStore((s) => s.playerId);
   const isHost = useIsHost();
   const { isDevMode, activateDevMode } = useDevMode();
+  const { playMusic, playModeratorSnippet } = useAudio();
+
+  // Play lobby music when entering the lobby
+  useEffect(() => {
+    playMusic('lobby');
+    // No cleanup — music continues until the next screen calls playMusic/stopMusic
+  }, [playMusic]);
   
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -544,7 +552,9 @@ export function LobbyScreen() {
     setStarting(true);
     setError(null);
     const result = await startGame();
-    if (!result.success) {
+    if (result.success) {
+      playModeratorSnippet('welcome');
+    } else {
       setError(result.error || 'Fehler');
     }
     setStarting(false);

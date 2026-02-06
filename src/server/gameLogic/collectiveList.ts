@@ -516,7 +516,7 @@ export function endCollectiveListRound(room: GameRoom, io: SocketServer, reason:
     `${p.playerName}: ${p.correctAnswers}x${bonusRound.pointsPerCorrect}=${p.correctPoints} + ${p.rankBonus} rank = ${p.totalPoints}`
   ));
 
-  io.to(room.code).emit('bonus_round_end', {
+  io.to(room.code).emit('collective_list_end', {
     reason,
     winners: winners.map(id => {
       const p = room.players.get(id);

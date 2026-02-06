@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { useGameTimer } from '@/components/game';
+import { useAudio } from '@/hooks/useAudio';
 
 export function FinalScreen() {
   const router = useRouter();
@@ -34,8 +35,15 @@ export function FinalScreen() {
   const gameStatistics = useGameStore((s) => s.gameStatistics);
   const playerId = useGameStore((s) => s.playerId);
   const room = useGameStore((s) => s.room);
+  const { playMusic, playSfx } = useAudio();
   
   const [hasVoted, setHasVoted] = useState(false);
+
+  // Play finale music and fanfare
+  useEffect(() => {
+    playMusic('finale');
+    playSfx('fanfare');
+  }, [playMusic, playSfx]);
   const [myVote, setMyVote] = useState<'yes' | 'no' | null>(null);
   const [showConfetti, setShowConfetti] = useState(true);
   const [showStats, setShowStats] = useState(false);

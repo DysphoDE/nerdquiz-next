@@ -7,6 +7,7 @@ import { useGameStore } from '@/store/gameStore';
 import { getSocket } from '@/lib/socket';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { GameTimer, useGameTimer } from '@/components/game';
+import { useAudio } from '@/hooks/useAudio';
 
 interface CategorySelectedData {
   categoryId: string;
@@ -18,6 +19,7 @@ interface CategorySelectedData {
 export function LosersPickScreen() {
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
+  const { playSfx } = useAudio();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [revealedCategory, setRevealedCategory] = useState<CategorySelectedData | null>(null);
 
@@ -48,6 +50,7 @@ export function LosersPickScreen() {
     if (!isLoser || selectedCategory) return;
     
     setSelectedCategory(categoryId);
+    playSfx('buzz');
     const socket = getSocket();
     socket.emit('loser_pick_category', {
       roomCode: room?.code,

@@ -8,6 +8,7 @@ import { getSocket } from '@/lib/socket';
 import { Clock, Check, Sparkles } from 'lucide-react';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { GameTimer, useGameTimer } from '@/components/game';
+import { useAudio } from '@/hooks/useAudio';
 import { GAME_TIMERS } from '@/config/constants';
 
 interface CategoryPosition {
@@ -30,6 +31,7 @@ export function VotingScreen() {
   const { voteCategory } = useSocket();
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
+  const { playSfx } = useAudio();
   
   const [voted, setVoted] = useState<string | null>(null);
   const categoryRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -111,6 +113,7 @@ export function VotingScreen() {
   const handleVote = (categoryId: string) => {
     if (myVote) return;
     setVoted(categoryId);
+    playSfx('buzz');
     voteCategory(categoryId);
   };
 

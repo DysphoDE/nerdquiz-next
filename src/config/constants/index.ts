@@ -82,6 +82,22 @@ export {
 } from './thresholds';
 
 // ============================================
+// TTS CONSTANTS
+// ============================================
+
+export {
+  TTS_VOICES,
+  TTS_MODELS,
+  TTS_CONFIG,
+  TTS_INSTRUCTIONS,
+  TTS_API,
+  type TtsVoice,
+  type TtsModel,
+  type TtsInstructionKey,
+  type TtsConstant,
+} from './tts';
+
+// ============================================
 // CONVENIENCE RE-EXPORTS
 // ============================================
 
@@ -126,6 +142,14 @@ import {
   PARTICIPATION_THRESHOLDS as _PARTICIPATION_THRESHOLDS,
   BONUS_ROUND_THRESHOLDS as _BONUS_ROUND_THRESHOLDS,
 } from './thresholds';
+
+import {
+  TTS_VOICES as _TTS_VOICES,
+  TTS_MODELS as _TTS_MODELS,
+  TTS_CONFIG as _TTS_CONFIG,
+  TTS_INSTRUCTIONS as _TTS_INSTRUCTIONS,
+  TTS_API as _TTS_API,
+} from './tts';
 
 /**
  * Alle Timing-Konstanten in einem Objekt
@@ -184,3 +208,13 @@ export const THRESHOLDS = {
   BONUS_ROUND: _BONUS_ROUND_THRESHOLDS,
 } as const;
 
+/**
+ * Alle TTS-Konstanten in einem Objekt
+ */
+export const TTS = {
+  VOICES: _TTS_VOICES,
+  MODELS: _TTS_MODELS,
+  CONFIG: _TTS_CONFIG,
+  INSTRUCTIONS: _TTS_INSTRUCTIONS,
+  API: _TTS_API,
+} as const;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { useGameStore, type BonusRoundEndResult, type HotButtonBuzzEvent, type HotButtonEndResult } from '@/store/gameStore';
+import { useGameStore, type CollectiveListEndResult, type HotButtonBuzzEvent, type HotButtonEndResult } from '@/store/gameStore';
 import type { RoomState, AnswerResult, FinalRanking, GameStatistics } from '@/types/game';
 import { getSocket } from '@/lib/socket';
 import { saveSession, clearSession } from '@/lib/session';
@@ -16,7 +16,7 @@ export function useSocket() {
     setLastResults,
     setFinalRankings,
     setGameStatistics,
-    setBonusRoundResult,
+    setCollectiveListResult,
     setHotButtonBuzz,
     setHotButtonEndResult,
     resetQuestion,
@@ -85,9 +85,9 @@ export function useSocket() {
       console.log(`✅ ${playerName} answered`);
     };
 
-    const handleBonusRoundEnd = (data: BonusRoundEndResult) => {
-      console.log('🎯 Bonus round ended:', data);
-      setBonusRoundResult(data);
+    const handleCollectiveListEnd = (data: CollectiveListEndResult) => {
+      console.log('🎯 Collective list round ended:', data);
+      setCollectiveListResult(data);
     };
 
     const handleHotButtonBuzz = (data: HotButtonBuzzEvent) => {
@@ -128,7 +128,7 @@ export function useSocket() {
     socket.on('player_joined', handlePlayerJoined);
     socket.on('player_disconnected', handlePlayerDisconnected);
     socket.on('player_answered', handlePlayerAnswered);
-    socket.on('bonus_round_end', handleBonusRoundEnd);
+    socket.on('collective_list_end', handleCollectiveListEnd);
     socket.on('hot_button_buzz', handleHotButtonBuzz);
     socket.on('hot_button_end', handleHotButtonEnd);
     socket.on('kicked_from_room', handleKickedFromRoom);
@@ -153,13 +153,13 @@ export function useSocket() {
       socket.off('player_joined', handlePlayerJoined);
       socket.off('player_disconnected', handlePlayerDisconnected);
       socket.off('player_answered', handlePlayerAnswered);
-      socket.off('bonus_round_end', handleBonusRoundEnd);
+      socket.off('collective_list_end', handleCollectiveListEnd);
       socket.off('hot_button_buzz', handleHotButtonBuzz);
       socket.off('hot_button_end', handleHotButtonEnd);
       socket.off('kicked_from_room', handleKickedFromRoom);
       socket.off('rematch_result', handleRematchResult);
     };
-  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setBonusRoundResult, setHotButtonBuzz, setHotButtonEndResult, resetQuestion, reset]);
+  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setCollectiveListResult, setHotButtonBuzz, setHotButtonEndResult, resetQuestion, reset]);
 
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store
@@ -309,18 +309,18 @@ export function useSocket() {
     socket.emit('update_avatar', { roomCode, playerId, avatarOptions });
   }, []);
 
-  const submitBonusRoundAnswer = useCallback((answer: string) => {
+  const submitCollectiveListAnswer = useCallback((answer: string) => {
     const socket = getSocket();
     const { playerId, roomCode } = useGameStore.getState();
     if (!roomCode || !playerId) return;
-    socket.emit('bonus_round_submit', { roomCode, playerId, answer });
+    socket.emit('collective_list_submit', { roomCode, playerId, answer });
   }, []);
 
-  const skipBonusRound = useCallback(() => {
+  const skipCollectiveListTurn = useCallback(() => {
     const socket = getSocket();
     const { playerId, roomCode } = useGameStore.getState();
     if (!roomCode || !playerId) return;
-    socket.emit('bonus_round_skip', { roomCode, playerId });
+    socket.emit('collective_list_skip', { roomCode, playerId });
   }, []);
   
   const buzzHotButton = useCallback(() => {
@@ -358,8 +358,8 @@ export function useSocket() {
     leaveGame,
     rerollAvatar,
     updateAvatar,
-    submitBonusRoundAnswer,
-    skipBonusRound,
+    submitCollectiveListAnswer,
+    skipCollectiveListTurn,
     buzzHotButton,
     submitHotButtonAnswer,
     voteRematch,

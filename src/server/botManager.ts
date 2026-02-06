@@ -202,7 +202,7 @@ class BotManager {
         
         console.log(`🤖 ${bot.name} gives up (bonus round)`);
         
-        this.triggerAction('bonus_round_skip', {
+        this.triggerAction('collective_list_skip', {
           roomCode: bot.roomCode,
           playerId: bot.id,
         });
@@ -236,7 +236,7 @@ class BotManager {
       
       console.log(`🤖 ${bot.name} answers: "${answer}" (bonus round)`);
       
-      this.triggerAction('bonus_round_submit', {
+      this.triggerAction('collective_list_submit', {
         roomCode: bot.roomCode,
         playerId: bot.id,
         answer: answer,

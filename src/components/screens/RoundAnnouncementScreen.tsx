@@ -9,6 +9,7 @@ import {
   Star,
 } from 'lucide-react';
 import { useGameStore } from '@/store/gameStore';
+import { useAudio } from '@/hooks/useAudio';
 import { cn } from '@/lib/utils';
 import {
   getCategoryModesForRoulette,
@@ -285,6 +286,12 @@ export function RoundAnnouncementScreen() {
   const room = useGameStore((s) => s.room);
   const [rouletteComplete, setRouletteComplete] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
+  const { playSfx } = useAudio();
+
+  // Play wheel spin sound when roulette starts
+  useEffect(() => {
+    playSfx('wheelSpin');
+  }, [playSfx]);
   
   if (!room) return null;
 

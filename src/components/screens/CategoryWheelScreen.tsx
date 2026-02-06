@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
+import { useAudio } from '@/hooks/useAudio';
 
 const WHEEL_COLORS = [
   '#ef4444', // red
@@ -24,6 +25,7 @@ const WHEEL_SEGMENTS = 8;
 
 export function CategoryWheelScreen() {
   const room = useGameStore((s) => s.room);
+  const { playSfx } = useAudio();
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -47,6 +49,7 @@ export function CategoryWheelScreen() {
     const adjustedIndex = idx % categories.length;
     setSelectedIndex(adjustedIndex);
     setSpinning(true);
+    playSfx('wheelSpin');
 
     // Calculate target rotation
     // The wheel is drawn with segment 0 at the top (starting at -90° in SVG coords)

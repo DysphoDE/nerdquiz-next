@@ -8,12 +8,19 @@ import { useGameStore, usePlayers } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Leaderboard, GameTimer, useGameTimer } from '@/components/game';
+import { useAudio } from '@/hooks/useAudio';
 
 export function EstimationScreen() {
   const { submitEstimation } = useSocket();
   const { room, hasSubmitted, setHasSubmitted, estimationValue, setEstimationValue } = useGameStore();
   const players = usePlayers();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { playMusic } = useAudio();
+
+  // Play estimation music when entering
+  useEffect(() => {
+    playMusic('estimation');
+  }, [playMusic]);
 
   const question = room?.currentQuestion;
   const answeredCount = players.filter(p => p.hasAnswered).length;

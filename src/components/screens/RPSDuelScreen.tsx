@@ -8,6 +8,7 @@ import { getSocket } from '@/lib/socket';
 import type { RPSChoice } from '@/types/game';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { useGameTimer } from '@/components/game';
+import { useAudio } from '@/hooks/useAudio';
 
 // RPS Icons and colors
 const RPS_CONFIG: Record<RPSChoice, { emoji: string; name: string; color: string; beats: RPSChoice }> = {
@@ -38,6 +39,7 @@ interface CategorySelectedData {
 export function RPSDuelScreen() {
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
+  const { playSfx } = useAudio();
   
   const [phase, setPhase] = useState<'selecting' | 'choosing' | 'revealing' | 'result' | 'picking' | 'selected'>('selecting');
   const [player1, setPlayer1] = useState<DuelPlayer | null>(null);
@@ -203,6 +205,7 @@ export function RPSDuelScreen() {
     if (!isParticipant || myChoice || phase !== 'choosing') return;
     
     setMyChoice(choice);
+    playSfx('buzz');
     const socket = getSocket();
     socket.emit('rps_choice', { roomCode: room?.code, playerId, choice });
   };

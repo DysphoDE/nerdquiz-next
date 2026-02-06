@@ -8,6 +8,7 @@ import { getSocket } from '@/lib/socket';
 import { cn } from '@/lib/utils';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { useGameTimer } from '@/components/game';
+import { useAudio } from '@/hooks/useAudio';
 
 interface PlayerRollData {
   playerId: string;
@@ -278,6 +279,7 @@ function PlayerCard({
 export function DiceRoyaleScreen() {
   const room = useGameStore((s) => s.room);
   const playerId = useGameStore((s) => s.playerId);
+  const { playSfx } = useAudio();
   
   const [phase, setPhase] = useState<'rolling' | 'reroll' | 'result' | 'picking' | 'selected'>('rolling');
   const [playerRolls, setPlayerRolls] = useState<Map<string, number[] | null>>(new Map());
@@ -451,6 +453,7 @@ export function DiceRoyaleScreen() {
     
     setIsRolling(true);
     setHasRolled(true);
+    playSfx('buzz');
     
     const socket = getSocket();
     socket.emit('dice_royale_roll', { roomCode: room?.code, playerId });

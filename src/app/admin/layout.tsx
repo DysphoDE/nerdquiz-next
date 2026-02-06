@@ -15,6 +15,7 @@ import {
   BarChart3,
   LogOut,
   HeartPulse,
+  Volume2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -57,6 +58,11 @@ const navItems: NavItem[] = [
     href: '/admin/health', 
     label: 'Datenqualität', 
     icon: <HeartPulse className="w-5 h-5" /> 
+  },
+  { 
+    href: '/admin/tts', 
+    label: 'TTS Studio', 
+    icon: <Volume2 className="w-5 h-5" /> 
   },
 ];
 

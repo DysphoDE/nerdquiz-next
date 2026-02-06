@@ -16,12 +16,13 @@ import {
   Zap,
 } from 'lucide-react';
 import { useSocket } from '@/hooks/useSocket';
-import { useGameStore, usePlayers, type BonusRoundEndResult } from '@/store/gameStore';
+import { useGameStore, usePlayers } from '@/store/gameStore';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Leaderboard, GameTimer, useGameTimer } from '@/components/game';
 import { GameAvatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { useAudio } from '@/hooks/useAudio';
 import type { CollectiveListBonusRound } from '@/types/game';
 
 // ============================================
@@ -443,9 +444,10 @@ function TurnIndicatorWithFuse({
  * Der letzte verbleibende Spieler gewinnt.
  */
 export function CollectiveListGame() {
-  const { submitBonusRoundAnswer, skipBonusRound } = useSocket();
-  const { room, playerId, bonusRoundResult } = useGameStore();
+  const { submitCollectiveListAnswer, skipCollectiveListTurn } = useSocket();
+  const { room, playerId, collectiveListResult } = useGameStore();
   const players = usePlayers();
+  const { playMusic, playSfx } = useAudio();
   
   const [inputValue, setInputValue] = useState('');
   const [lastResult, setLastResult] = useState<'correct' | 'wrong' | 'already_guessed' | null>(null);
@@ -478,6 +480,20 @@ export function CollectiveListGame() {
   const isIntro = bonusRound?.phase === 'intro';
   const isPlaying = bonusRound?.phase === 'playing';
   const isFinished = bonusRound?.phase === 'finished';
+
+  // Play bonus round music when entering
+  useEffect(() => {
+    playMusic('bonusRound');
+  }, [playMusic]);
+
+  // Play SFX for correct/wrong answers
+  useEffect(() => {
+    if (lastResult === 'correct') {
+      playSfx('correct');
+    } else if (lastResult === 'wrong' || lastResult === 'already_guessed') {
+      playSfx('wrong');
+    }
+  }, [lastResult, playSfx]);
 
   // Auto-focus input when it's my turn
   useEffect(() => {
@@ -632,14 +648,14 @@ export function CollectiveListGame() {
 
   const handleSubmit = () => {
     if (!inputValue.trim() || !isMyTurn || duplicateWarning) return;
-    submitBonusRoundAnswer(inputValue.trim());
+    submitCollectiveListAnswer(inputValue.trim());
     setInputValue('');
     setDuplicateWarning(null);
   };
 
   const handleSkip = () => {
     if (!isMyTurn) return;
-    skipBonusRound();
+    skipCollectiveListTurn();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1096,7 +1112,7 @@ export function CollectiveListGame() {
                 </Card>
 
                 {/* Compact Score Breakdown */}
-                {bonusRoundResult && bonusRoundResult.playerScoreBreakdown.length > 0 && (
+                {collectiveListResult && collectiveListResult.playerScoreBreakdown.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1110,7 +1126,7 @@ export function CollectiveListGame() {
                         <span className="text-xs text-muted-foreground">Punkte dieser Runde</span>
                       </div>
                       <div className="divide-y divide-white/5">
-                        {bonusRoundResult.playerScoreBreakdown.map((score, index) => {
+                        {collectiveListResult.playerScoreBreakdown.map((score, index) => {
                           const isMe = score.playerId === playerId;
                           const isWinner = score.rank === 1;
                           

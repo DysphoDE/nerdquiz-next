@@ -9,6 +9,8 @@ import { loadSession, hasSessionForRoom, clearSession } from '@/lib/session';
 import { PLAYER_VALIDATION } from '@/config/constants';
 import { DevPanel } from '@/components/dev/DevPanel';
 import { QuestionDebugPanel } from '@/components/dev/QuestionDebugPanel';
+import { AudioControls } from '@/components/ui/AudioControls';
+import { useAudioInit } from '@/hooks/useAudio';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,6 +36,9 @@ export default function RoomPage() {
   const params = useParams();
   const router = useRouter();
   const roomCode = (params.code as string)?.toUpperCase();
+  
+  // Initialize audio system (sync store → AudioManager, autoplay unlock)
+  useAudioInit();
   
   const { joinRoom, reconnectPlayer } = useSocket();
   const room = useGameStore((s) => s.room);
@@ -274,6 +279,9 @@ export default function RoomPage() {
       <AnimatePresence mode="wait">
         {renderScreen()}
       </AnimatePresence>
+      
+      {/* Audio Controls - floating volume widget */}
+      <AudioControls />
       
       {/* Dev Panel - only shows in development mode */}
       <DevPanel />
