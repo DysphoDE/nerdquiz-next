@@ -350,6 +350,9 @@ export interface GameRoom {
   isPaused?: boolean;
   pausedAt?: number; // Timestamp when paused
   remainingTime?: number; // Remaining time in ms when paused
+  // Game start animation: server waits for client to finish overlay before starting timers
+  gameStartReadyCallback?: () => void;
+  gameStartReadyTimeout?: NodeJS.Timeout;
 }
 
 // ============================================

@@ -404,53 +404,66 @@ class AudioManager {
   /**
    * Spielt einen zufälligen vorproduzierten Moderator-Clip aus einer Kategorie ab.
    * Nutzt den TTS-Lautstärkekanal. Vermeidet direkte Wiederholung des gleichen Clips.
-   * 
+   *
    * @param category - Die Snippet-Kategorie (z.B. 'correct', 'wrong', 'welcome')
+   * @returns Promise die resolved wenn die Wiedergabe beendet ist
    */
-  playModeratorSnippet(category: TtsSnippetCategory): void {
-    const files = TTS_SNIPPETS[category];
-    if (!files || files.length === 0) {
-      console.warn(`[AudioManager] No snippets loaded for category "${category}"`);
-      return;
-    }
-    const fileCount = files.length;
+  playModeratorSnippet(category: TtsSnippetCategory): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const files = TTS_SNIPPETS[category];
+      if (!files || files.length === 0) {
+        console.warn(`[AudioManager] No snippets loaded for category "${category}"`);
+        resolve();
+        return;
+      }
+      const fileCount = files.length;
 
-    // Pick a random index, avoiding the last one played
-    let index: number;
-    const lastIndex = this.lastSnippetIndex.get(category) ?? -1;
-    if (fileCount === 1) {
-      index = 0;
-    } else {
-      do {
-        index = Math.floor(Math.random() * fileCount);
-      } while (index === lastIndex);
-    }
-    this.lastSnippetIndex.set(category, index);
+      // Pick a random index, avoiding the last one played
+      let index: number;
+      const lastIndex = this.lastSnippetIndex.get(category) ?? -1;
+      if (fileCount === 1) {
+        index = 0;
+      } else {
+        do {
+          index = Math.floor(Math.random() * fileCount);
+        } while (index === lastIndex);
+      }
+      this.lastSnippetIndex.set(category, index);
 
-    const src = files[index];
-    const cacheKey = `snippet:${src}`;
+      const src = files[index];
+      const cacheKey = `snippet:${src}`;
 
-    // Don't retry previously failed loads
-    if (this.failedLoads.has(cacheKey)) return;
+      // Don't retry previously failed loads
+      if (this.failedLoads.has(cacheKey)) {
+        resolve();
+        return;
+      }
 
-    let howl = this.snippetCache.get(src);
-    if (!howl) {
-      howl = new Howl({
-        src: [src],
-        volume: this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS,
-        preload: true,
-        onloaderror: (_id, error) => {
-          console.warn(`[AudioManager] Failed to load snippet "${src}":`, error);
-          this.failedLoads.add(cacheKey);
-          this.snippetCache.delete(src);
-        },
-      });
-      this.snippetCache.set(src, howl);
-    }
+      let howl = this.snippetCache.get(src);
+      if (!howl) {
+        howl = new Howl({
+          src: [src],
+          volume: this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS,
+          preload: true,
+          onloaderror: (_id, error) => {
+            console.warn(`[AudioManager] Failed to load snippet "${src}":`, error);
+            this.failedLoads.add(cacheKey);
+            this.snippetCache.delete(src);
+            resolve();
+          },
+        });
+        this.snippetCache.set(src, howl);
+      }
 
-    // Update volume before playing (in case it changed)
-    howl.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS);
-    howl.play();
+      // Update volume before playing (in case it changed)
+      howl.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS);
+
+      // Resolve when playback finishes (or on error)
+      howl.once('end', () => resolve());
+      howl.once('playerror', () => resolve());
+
+      howl.play();
+    });
   }
 
   /**

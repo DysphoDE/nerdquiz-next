@@ -36,95 +36,140 @@ type ConnectionState = 'loading' | 'reconnecting' | 'join_form' | 'connected' | 
 // GAME START OVERLAY - Fullscreen "NerdBattle" Animation
 // ============================================
 
-function GameStartOverlay({ onComplete }: { onComplete: () => void }) {
-  const [phase, setPhase] = useState<'enter' | 'title' | 'subtitle' | 'flash' | 'exit'>('enter');
+function GameStartOverlay({ onComplete, ttsPromise }: { onComplete: () => void; ttsPromise?: Promise<void> }) {
+  const [phase, setPhase] = useState<'enter' | 'title' | 'subtitle' | 'hold' | 'flash' | 'exit'>('enter');
+  const [animationMinReached, setAnimationMinReached] = useState(false);
+  const [ttsFinished, setTtsFinished] = useState(false);
+  const hasExited = useRef(false);
 
-  // Tight timing: total ~2.5s so the next screen (round_announcement)
-  // still has enough of its server-side timer left (e.g. WHEEL_ANIMATION = 5.5s)
+  // Track when TTS finishes
+  useEffect(() => {
+    if (!ttsPromise) {
+      setTtsFinished(true);
+      return;
+    }
+    ttsPromise.then(() => setTtsFinished(true)).catch(() => setTtsFinished(true));
+  }, [ttsPromise]);
+
+  // Animation phases - extended timeline for a more dramatic reveal
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('title'), 150),
-      setTimeout(() => setPhase('subtitle'), 700),
-      setTimeout(() => setPhase('flash'), 1700),
-      setTimeout(() => setPhase('exit'), 2000),
-      setTimeout(() => onComplete(), 2500),
+      setTimeout(() => setPhase('title'), 300),
+      setTimeout(() => setPhase('subtitle'), 1000),
+      setTimeout(() => setPhase('hold'), 2200),
+      setTimeout(() => setAnimationMinReached(true), 3500),
     ];
     return () => timers.forEach(clearTimeout);
-  }, [onComplete]);
+  }, []);
+
+  // Exit when both animation minimum and TTS are done
+  useEffect(() => {
+    if (animationMinReached && ttsFinished && !hasExited.current) {
+      hasExited.current = true;
+      setPhase('flash');
+      const t1 = setTimeout(() => setPhase('exit'), 400);
+      const t2 = setTimeout(() => onComplete(), 900);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [animationMinReached, ttsFinished, onComplete]);
+
+  const isHolding = phase === 'hold';
+  const isVisible = phase !== 'exit';
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.3 }}
       className="min-h-screen flex items-center justify-center overflow-hidden relative"
       style={{ background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000000 100%)' }}
     >
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden">
-        {Array.from({ length: 20 }).map((_, i) => (
+        {Array.from({ length: 30 }).map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 rounded-full"
+            className="absolute rounded-full"
             style={{
-              left: `${10 + (i * 4.2) % 80}%`,
-              top: `${20 + (i * 3.7) % 60}%`,
-              background: ['#06b6d4', '#10b981', '#f59e0b', '#14b8a6', '#22d3ee'][i % 5],
+              left: `${5 + (i * 3.1) % 90}%`,
+              top: `${15 + (i * 2.9) % 70}%`,
+              width: `${2 + (i % 3)}px`,
+              height: `${2 + (i % 3)}px`,
+              background: ['#06b6d4', '#10b981', '#f59e0b', '#14b8a6', '#22d3ee', '#a78bfa'][i % 6],
             }}
             initial={{ opacity: 0, scale: 0 }}
             animate={{
-              opacity: [0, 1, 0],
-              scale: [0, 2.5, 0],
-              y: [0, -80 - (i % 5) * 30],
-              x: [0, ((i % 3) - 1) * 40],
+              opacity: [0, 0.8, 0],
+              scale: [0, 2, 0],
+              y: [0, -100 - (i % 5) * 40],
+              x: [0, ((i % 5) - 2) * 30],
             }}
             transition={{
-              duration: 1.5 + (i % 3) * 0.5,
-              delay: 0.1 + (i % 8) * 0.15,
+              duration: 2 + (i % 4) * 0.5,
+              delay: 0.1 + (i % 10) * 0.2,
               ease: 'easeOut',
+              repeat: isHolding ? Infinity : 0,
+              repeatDelay: 1,
             }}
           />
         ))}
       </div>
 
-      {/* Energy lines */}
+      {/* Sweeping energy lines */}
       <AnimatePresence>
-        {(phase === 'title' || phase === 'subtitle') && (
+        {isVisible && phase !== 'enter' && (
           <>
             <motion.div
               className="absolute left-0 top-1/2 -translate-y-1/2 w-2/5 h-[2px]"
               style={{ background: 'linear-gradient(90deg, transparent, #10b981, transparent)' }}
               initial={{ scaleX: 0, opacity: 0 }}
-              animate={{ scaleX: 1, opacity: [0, 1, 0.6] }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
+              animate={{ scaleX: 1, opacity: [0, 1, 0.5] }}
+              exit={{ opacity: 0, scaleX: 0 }}
+              transition={{ duration: 0.6 }}
             />
             <motion.div
               className="absolute right-0 top-1/2 -translate-y-1/2 w-2/5 h-[2px]"
               style={{ background: 'linear-gradient(270deg, transparent, #06b6d4, transparent)' }}
               initial={{ scaleX: 0, opacity: 0 }}
-              animate={{ scaleX: 1, opacity: [0, 1, 0.6] }}
+              animate={{ scaleX: 1, opacity: [0, 1, 0.5] }}
+              exit={{ opacity: 0, scaleX: 0 }}
+              transition={{ duration: 0.6 }}
+            />
+            {/* Vertical accent lines */}
+            <motion.div
+              className="absolute top-0 left-1/2 -translate-x-1/2 w-[1px] h-1/3"
+              style={{ background: 'linear-gradient(180deg, transparent, rgba(16,185,129,0.4), transparent)' }}
+              initial={{ scaleY: 0, opacity: 0 }}
+              animate={{ scaleY: 1, opacity: 0.6 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            />
+            <motion.div
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[1px] h-1/3"
+              style={{ background: 'linear-gradient(0deg, transparent, rgba(6,182,212,0.4), transparent)' }}
+              initial={{ scaleY: 0, opacity: 0 }}
+              animate={{ scaleY: 1, opacity: 0.6 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
             />
           </>
         )}
       </AnimatePresence>
 
-      {/* Central glow */}
+      {/* Central glow - pulses during hold phase */}
       <motion.div
-        className="absolute w-64 h-64 rounded-full"
+        className="absolute w-72 h-72 md:w-96 md:h-96 rounded-full"
         style={{
-          background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(6,182,212,0.15) 50%, transparent 70%)',
-          filter: 'blur(40px)',
+          background: 'radial-gradient(circle, rgba(16,185,129,0.25) 0%, rgba(6,182,212,0.12) 40%, transparent 70%)',
+          filter: 'blur(50px)',
         }}
         animate={{
-          scale: phase === 'flash' ? [1, 3] : [1, 1.3, 1],
-          opacity: phase === 'flash' ? [0.5, 1] : [0.3, 0.6, 0.3],
+          scale: phase === 'flash' ? [1, 4] : [1, 1.4, 1],
+          opacity: phase === 'flash' ? [0.6, 0] : [0.3, 0.7, 0.3],
         }}
         transition={{
-          duration: phase === 'flash' ? 0.3 : 1.5,
+          duration: phase === 'flash' ? 0.4 : 2,
           repeat: phase === 'flash' ? 0 : Infinity,
           ease: 'easeInOut',
         }}
@@ -136,8 +181,8 @@ function GameStartOverlay({ onComplete }: { onComplete: () => void }) {
           <motion.div
             className="absolute inset-0 bg-white z-10"
             initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.7, 0] }}
-            transition={{ duration: 0.4 }}
+            animate={{ opacity: [0, 0.8, 0] }}
+            transition={{ duration: 0.5 }}
           />
         )}
       </AnimatePresence>
@@ -153,25 +198,36 @@ function GameStartOverlay({ onComplete }: { onComplete: () => void }) {
               : { scale: 1, rotate: 0, opacity: 1 }
           }
           transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-          className="mb-4 flex justify-center"
+          className="mb-6 flex justify-center"
         >
-          <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-emerald-500 via-cyan-500 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+          <motion.div
+            className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-emerald-500 via-cyan-500 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/30"
+            animate={isHolding ? { rotate: [0, 5, -5, 0] } : {}}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          >
             <Swords className="w-8 h-8 md:w-10 md:h-10 text-white" />
-          </div>
+          </motion.div>
         </motion.div>
 
         {/* Title: NERD */}
         <motion.div
-          initial={{ y: 30, opacity: 0, scale: 0.5 }}
+          initial={{ x: -60, opacity: 0, scale: 0.7 }}
           animate={
             phase === 'exit'
-              ? { y: -30, opacity: 0, scale: 1.3 }
-              : { y: 0, opacity: 1, scale: 1 }
+              ? { y: -40, opacity: 0, scale: 1.5 }
+              : phase !== 'enter'
+                ? { x: 0, opacity: 1, scale: 1 }
+                : { x: -60, opacity: 0, scale: 0.7 }
           }
-          transition={{ type: 'spring', stiffness: 200, damping: 18, delay: phase === 'exit' ? 0 : 0.05 }}
+          transition={{
+            type: 'spring',
+            stiffness: 180,
+            damping: 16,
+            delay: phase === 'exit' ? 0 : 0.05,
+          }}
         >
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter">
-            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-300 bg-clip-text text-transparent">
+          <h1 className="text-7xl md:text-9xl font-black tracking-tighter">
+            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-teal-300 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(16,185,129,0.3)]">
               NERD
             </span>
           </h1>
@@ -179,32 +235,37 @@ function GameStartOverlay({ onComplete }: { onComplete: () => void }) {
 
         {/* Title: BATTLE */}
         <motion.div
-          initial={{ y: 30, opacity: 0, scale: 0.5 }}
+          initial={{ x: 60, opacity: 0, scale: 0.7 }}
           animate={
             phase === 'exit'
-              ? { y: -30, opacity: 0, scale: 1.3 }
-              : phase !== 'enter'
-                ? { y: 0, opacity: 1, scale: 1 }
-                : { y: 30, opacity: 0, scale: 0.5 }
+              ? { y: -40, opacity: 0, scale: 1.5 }
+              : phase !== 'enter' && phase !== 'title'
+                ? { x: 0, opacity: 1, scale: 1 }
+                : { x: 60, opacity: 0, scale: 0.7 }
           }
-          transition={{ type: 'spring', stiffness: 200, damping: 18, delay: phase === 'exit' ? 0.03 : 0.15 }}
+          transition={{
+            type: 'spring',
+            stiffness: 180,
+            damping: 16,
+            delay: phase === 'exit' ? 0.05 : 0.15,
+          }}
         >
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter -mt-2 md:-mt-3">
-            <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-amber-400 bg-clip-text text-transparent">
+          <h1 className="text-7xl md:text-9xl font-black tracking-tighter -mt-3 md:-mt-5">
+            <span className="bg-gradient-to-r from-cyan-400 via-teal-400 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(6,182,212,0.3)]">
               BATTLE
             </span>
           </h1>
         </motion.div>
 
-        {/* Subtitle */}
+        {/* Subtitle - stays visible during hold */}
         <AnimatePresence>
-          {(phase === 'subtitle' || phase === 'flash') && (
+          {(phase === 'subtitle' || phase === 'hold') && (
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-              className="mt-5"
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.4 }}
+              className="mt-6"
             >
               <div className="flex items-center justify-center gap-2 text-lg md:text-xl text-muted-foreground font-medium">
                 <Zap className="w-5 h-5 text-amber-400" />
@@ -215,22 +276,56 @@ function GameStartOverlay({ onComplete }: { onComplete: () => void }) {
           )}
         </AnimatePresence>
 
+        {/* Equalizer bars - visible during hold (while TTS is playing) */}
+        <AnimatePresence>
+          {isHolding && !ttsFinished && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex items-end justify-center gap-1 mt-8 h-6"
+            >
+              {[0, 1, 2, 3, 4].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-1 rounded-full bg-gradient-to-t from-emerald-500 to-cyan-400"
+                  animate={{ height: ['8px', `${14 + (i % 3) * 6}px`, '8px'] }}
+                  transition={{
+                    duration: 0.5 + i * 0.1,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: i * 0.08,
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Pulsing rings */}
         <motion.div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 md:w-64 md:h-64 rounded-full border-2 border-emerald-500/20"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 md:w-72 md:h-72 rounded-full border-2 border-emerald-500/20"
           animate={{
-            scale: [1, 1.5, 1],
+            scale: [1, 1.6, 1],
             opacity: [0.3, 0, 0.3],
           }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 md:w-64 md:h-64 rounded-full border-2 border-cyan-500/20"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 md:w-72 md:h-72 rounded-full border-2 border-cyan-500/20"
           animate={{
-            scale: [1, 1.8, 1],
+            scale: [1, 2, 1],
             opacity: [0.2, 0, 0.2],
           }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
+        />
+        <motion.div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 md:w-72 md:h-72 rounded-full border border-amber-500/10"
+          animate={{
+            scale: [1, 2.4, 1],
+            opacity: [0.15, 0, 0.15],
+          }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
         />
       </div>
     </motion.div>
@@ -245,7 +340,7 @@ export default function RoomPage() {
   // Initialize audio system (sync store → AudioManager, autoplay unlock)
   useAudioInit();
   
-  const { joinRoom, reconnectPlayer } = useSocket();
+  const { joinRoom, reconnectPlayer, emitGameStartReady } = useSocket();
   const { playModeratorSnippet, playSfx } = useAudio();
   const room = useGameStore((s) => s.room);
   const isConnected = useGameStore((s) => s.isConnected);
@@ -258,32 +353,35 @@ export default function RoomPage() {
   
   // === Game Start Animation & Welcome TTS for ALL players ===
   // When the phase transitions from 'lobby' to any game phase, we show
-  // the GameStartOverlay as an INTERCEPTING screen. This prevents the
-  // next screen (e.g. RoundAnnouncementScreen) from mounting until the
-  // animation finishes, so its server-driven timers aren't wasted.
+  // the GameStartOverlay as an INTERCEPTING screen. The overlay waits for
+  // BOTH the animation AND the TTS moderator to finish before completing.
+  // On completion, we emit 'game_start_ready' so the server starts its timers.
   const [showStartAnimation, setShowStartAnimation] = useState(false);
+  const ttsPromiseRef = useRef<Promise<void> | undefined>(undefined);
   const prevPhaseRef = useRef<string | null>(null);
-  
+
   useEffect(() => {
     const currentPhase = room?.phase ?? null;
     const prevPhase = prevPhaseRef.current;
-    
+
     // Detect transition from lobby to any game phase
     if (prevPhase === 'lobby' && currentPhase && currentPhase !== 'lobby') {
+      // Start TTS and capture the promise so overlay can wait for it
+      ttsPromiseRef.current = playModeratorSnippet('welcome');
       // Show the start animation screen for ALL players
       setShowStartAnimation(true);
-      // Play welcome TTS for ALL players (not just host)
-      playModeratorSnippet('welcome');
       // Play a dramatic SFX
       playSfx('fanfare');
     }
-    
+
     prevPhaseRef.current = currentPhase;
   }, [room?.phase, playModeratorSnippet, playSfx]);
-  
+
   const handleStartAnimationComplete = useCallback(() => {
     setShowStartAnimation(false);
-  }, []);
+    // Tell the server we're ready - it starts WHEEL_ANIMATION timer from now
+    emitGameStartReady();
+  }, [emitGameStartReady]);
 
   // Check for existing session and try to reconnect
   useEffect(() => {
@@ -364,7 +462,7 @@ export default function RoomPage() {
     // This prevents the next screen from mounting (and wasting its timers)
     // until the animation is complete.
     if (showStartAnimation) {
-      return <GameStartOverlay key="game-start" onComplete={handleStartAnimationComplete} />;
+      return <GameStartOverlay key="game-start" onComplete={handleStartAnimationComplete} ttsPromise={ttsPromiseRef.current} />;
     }
     
     switch (room.phase) {

@@ -344,6 +344,14 @@ export function useSocket() {
     socket.emit('vote_rematch', { roomCode, playerId, vote });
   }, []);
 
+  const emitGameStartReady = useCallback(() => {
+    const socket = getSocket();
+    const { roomCode } = useGameStore.getState();
+    if (!roomCode) return;
+    console.log('🎬 Emitting game_start_ready');
+    socket.emit('game_start_ready', { roomCode });
+  }, []);
+
   return {
     createRoom,
     joinRoom,
@@ -363,5 +371,6 @@ export function useSocket() {
     buzzHotButton,
     submitHotButtonAnswer,
     voteRematch,
+    emitGameStartReady,
   };
 }

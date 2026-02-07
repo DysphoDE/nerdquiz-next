@@ -161,8 +161,8 @@ export function useAudio() {
     audioManager.preloadSfx(keys);
   }, []);
 
-  const playModeratorSnippet = useCallback((category: TtsSnippetCategory) => {
-    audioManager.playModeratorSnippet(category);
+  const playModeratorSnippet = useCallback((category: TtsSnippetCategory): Promise<void> => {
+    return audioManager.playModeratorSnippet(category);
   }, []);
 
   const preloadSnippets = useCallback((categories: TtsSnippetCategory[]) => {

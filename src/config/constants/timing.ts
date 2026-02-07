@@ -42,6 +42,9 @@ export const UI_TIMING = {
   
   /** Kategorie-Ankündigung Dauer (2500ms) */
   CATEGORY_ANNOUNCEMENT: 2500,
+
+  /** Maximale Wartezeit auf game_start_ready vom Client (15s Fallback) */
+  GAME_START_MAX_WAIT: 15000,
 } as const;
 
 // ============================================

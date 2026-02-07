@@ -43,6 +43,41 @@ import type { CustomRoundConfig, RoundType } from '@/config/customGame.shared';
 const dev = process.env.NODE_ENV !== 'production';
 
 // ============================================
+// GAME START ANIMATION HELPER
+// ============================================
+
+/**
+ * Verzögert eine Aktion bis der Client die Game-Start-Animation abgeschlossen hat.
+ * Bei normalem Rundenübergang (nicht Game-Start) wird direkt gestartet.
+ *
+ * @param room - Der GameRoom
+ * @param action - Die Aktion nach der Animation (z.B. Roulette-Timer starten)
+ * @param isGameStart - true wenn dies der erste Aufruf nach Spielstart ist
+ */
+function schedulePostAnnouncementAction(
+  room: GameRoom,
+  action: () => void,
+  isGameStart: boolean
+): void {
+  if (isGameStart) {
+    // Wait for client to signal that the game start overlay is done
+    room.gameStartReadyCallback = () => {
+      setTimeout(action, UI_TIMING.WHEEL_ANIMATION);
+    };
+    room.gameStartReadyTimeout = setTimeout(() => {
+      if (room.gameStartReadyCallback) {
+        console.log(`⏰ Game start ready timeout reached for room ${room.code}, proceeding anyway`);
+        room.gameStartReadyCallback();
+        room.gameStartReadyCallback = undefined;
+        room.gameStartReadyTimeout = undefined;
+      }
+    }, UI_TIMING.GAME_START_MAX_WAIT);
+  } else {
+    setTimeout(action, UI_TIMING.WHEEL_ANIMATION);
+  }
+}
+
+// ============================================
 // BONUS QUESTION LOADERS (Strategy Pattern)
 // ============================================
 
@@ -109,9 +144,10 @@ function selectBonusType(room: GameRoom): string {
  * Startet eine spezifische Bonusrunde nach Typ
  */
 async function startBonusRoundByType(
-  room: GameRoom, 
-  io: SocketServer, 
-  bonusType: 'hot_button' | 'collective_list'
+  room: GameRoom,
+  io: SocketServer,
+  bonusType: 'hot_button' | 'collective_list',
+  isGameStart = false
 ): Promise<boolean> {
   const excludeIds = Array.from(room.state.usedBonusQuestionIds);
   const hotButtonCount = room.settings.hotButtonQuestionsPerRound || 5;
@@ -166,18 +202,18 @@ async function startBonusRoundByType(
   
   // After roulette animation, start bonus round
   const roomCode = room.code;
-  setTimeout(() => {
+  schedulePostAnnouncementAction(room, () => {
     const currentRoom = getRoom(roomCode);
     if (!currentRoom || currentRoom.state.phase !== 'bonus_round_announcement') return;
-    
+
     const pendingQuestion = currentRoom.pendingBonusQuestion;
     delete currentRoom.pendingBonusQuestion;
-    
+
     if (pendingQuestion) {
       startBonusRound(currentRoom, io, pendingQuestion);
     }
-  }, UI_TIMING.WHEEL_ANIMATION);
-  
+  }, isGameStart);
+
   return true;
 }
 
@@ -185,34 +221,35 @@ async function startBonusRoundByType(
  * Startet eine Custom-Runde basierend auf der Konfiguration
  */
 async function startCustomRound(
-  room: GameRoom, 
-  io: SocketServer, 
-  roundConfig: CustomRoundConfig
+  room: GameRoom,
+  io: SocketServer,
+  roundConfig: CustomRoundConfig,
+  isGameStart = false
 ): Promise<void> {
   console.log(`🎮 Starting custom round: type=${roundConfig.type}, categoryMode=${roundConfig.categoryMode || 'N/A'}`);
-  
+
   switch (roundConfig.type) {
     case 'hot_button': {
-      const success = await startBonusRoundByType(room, io, 'hot_button');
+      const success = await startBonusRoundByType(room, io, 'hot_button', isGameStart);
       if (!success) {
         console.log(`⚠️ Hot Button not available, falling back to question round`);
-        await startQuestionRound(room, io, 'random');
+        await startQuestionRound(room, io, 'random', isGameStart);
       }
       break;
     }
-    
+
     case 'collective_list': {
-      const success = await startBonusRoundByType(room, io, 'collective_list');
+      const success = await startBonusRoundByType(room, io, 'collective_list', isGameStart);
       if (!success) {
         console.log(`⚠️ Collective List not available, falling back to question round`);
-        await startQuestionRound(room, io, 'random');
+        await startQuestionRound(room, io, 'random', isGameStart);
       }
       break;
     }
-    
+
     case 'question_round':
     default: {
-      await startQuestionRound(room, io, roundConfig.categoryMode || 'random');
+      await startQuestionRound(room, io, roundConfig.categoryMode || 'random', isGameStart);
       break;
     }
   }
@@ -222,9 +259,10 @@ async function startCustomRound(
  * Startet eine normale Fragerunde mit dem angegebenen Kategorie-Modus
  */
 async function startQuestionRound(
-  room: GameRoom, 
-  io: SocketServer, 
-  categoryMode: string
+  room: GameRoom,
+  io: SocketServer,
+  categoryMode: string,
+  isGameStart = false
 ): Promise<void> {
   // Kategorie-Modus bestimmen
   let mode: string;
@@ -270,10 +308,10 @@ async function startQuestionRound(
   // After announcement + roulette, start selection
   const roomCode = room.code;
   const expectedMode = room.state.categorySelectionMode;
-  setTimeout(() => {
+  schedulePostAnnouncementAction(room, () => {
     const currentRoom = getRoom(roomCode);
     if (!currentRoom || currentRoom.state.phase !== 'category_announcement') return;
-    
+
     switch (expectedMode) {
       case 'voting':
         startCategoryVoting(currentRoom, io);
@@ -293,7 +331,7 @@ async function startQuestionRound(
       default:
         startCategoryVoting(currentRoom, io);
     }
-  }, UI_TIMING.WHEEL_ANIMATION);
+  }, isGameStart);
 }
 
 // ============================================
@@ -309,28 +347,34 @@ async function startQuestionRound(
 export async function startCategorySelection(room: GameRoom, io: SocketServer): Promise<void> {
   // === RUNDENERHÖHUNG ===
   const comingFromScoreboard = room.state.phase === 'scoreboard';
-  
+
   if (comingFromScoreboard) {
     room.state.currentRound++;
     console.log(`📈 Round incremented to ${room.state.currentRound}/${room.settings.maxRounds}`);
   }
-  
+
+  // Detect initial game start (lobby → first round)
+  const isGameStart = !comingFromScoreboard && room.state.currentRound === 1;
+  if (isGameStart) {
+    console.log(`🎬 Game start detected — waiting for client animation before starting timers`);
+  }
+
   // === CUSTOM GAME MODE ===
   if (room.settings.customMode && room.settings.customRounds?.length > 0) {
     const totalCustomRounds = room.settings.customRounds.length;
-    
+
     // Prüfen ob Spiel vorbei
     if (room.state.currentRound > totalCustomRounds) {
       console.log(`🏁 All ${totalCustomRounds} custom rounds completed, showing final results`);
       showFinalResults(room, io);
       return;
     }
-    
+
     // Die aktuelle Rundenkonfiguration holen (0-indexed)
     const currentRoundConfig = room.settings.customRounds[room.state.currentRound - 1];
     console.log(`🎯 Custom Mode: Round ${room.state.currentRound}/${totalCustomRounds} - ${currentRoundConfig.type}`);
-    
-    await startCustomRound(room, io, currentRoundConfig);
+
+    await startCustomRound(room, io, currentRoundConfig, isGameStart);
     return;
   }
   
@@ -356,32 +400,32 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
     // Smart selection: Choose bonus type that hasn't been played yet
     const selectedBonusType = selectBonusType(room) as 'hot_button' | 'collective_list';
     console.log(`🎰 Selected bonus type: ${selectedBonusType} (used: [${Array.from(room.state.usedBonusTypes).join(', ')}])`);
-    
+
     // Try to start the selected bonus round
-    const success = await startBonusRoundByType(room, io, selectedBonusType);
-    
+    const success = await startBonusRoundByType(room, io, selectedBonusType, isGameStart);
+
     if (success) {
       return;
     }
-    
+
     // Fallback: Try other bonus types
     console.log(`⚠️ No ${selectedBonusType} questions available, trying fallback...`);
     const otherTypes = IMPLEMENTED_BONUS_TYPES_DATA.filter(t => t.id !== selectedBonusType);
-    
+
     for (const type of otherTypes) {
-      const fallbackSuccess = await startBonusRoundByType(room, io, type.id as 'hot_button' | 'collective_list');
+      const fallbackSuccess = await startBonusRoundByType(room, io, type.id as 'hot_button' | 'collective_list', isGameStart);
       if (fallbackSuccess) {
         console.log(`✅ Fallback successful: Using ${type.id}`);
         return;
       }
     }
-    
+
     console.log(`⚠️ No bonus round questions found in DB, falling back to normal round`);
   }
 
   // === NORMALE RUNDE ===
   // Nutze die startQuestionRound Hilfsfunktion für konsistentes Verhalten
-  await startQuestionRound(room, io, 'random');
+  await startQuestionRound(room, io, 'random', isGameStart);
 }
 
 // ============================================

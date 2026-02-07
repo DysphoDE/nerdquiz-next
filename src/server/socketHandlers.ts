@@ -149,6 +149,22 @@ export function setupSocketHandlers(io: SocketServer): void {
     // === RECONNECT ===
     socket.on('reconnect_player', handleReconnect(socket, io));
 
+    // === GAME START READY (client animation finished) ===
+    socket.on('game_start_ready', (data: { roomCode: string }) => {
+      if (!data?.roomCode) return;
+      const room = getRoom(data.roomCode);
+      if (!room?.gameStartReadyCallback) return;
+
+      console.log(`🎬 Game start ready received for room ${room.code}`);
+      if (room.gameStartReadyTimeout) {
+        clearTimeout(room.gameStartReadyTimeout);
+        room.gameStartReadyTimeout = undefined;
+      }
+      const callback = room.gameStartReadyCallback;
+      room.gameStartReadyCallback = undefined;
+      callback();
+    });
+
     // === TIME SYNC ===
     socket.on('time_sync_request', (data: { clientTime: number }) => {
       handleTimeSyncRequest(socket, data.clientTime);
