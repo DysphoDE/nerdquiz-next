@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { generateQuestionHash } from '@/lib/utils';
 
 interface ImportQuestion {
   type: string;
@@ -49,98 +50,102 @@ export async function POST(request: NextRequest) {
     let failed = 0;
     const errors: string[] = [];
 
-    // Process each question
-    for (const q of questions as ImportQuestion[]) {
-      try {
-        // Debug: Log if _originalQuestion is present
-        console.log('[Import] Question:', q.question.substring(0, 50), '| _originalQuestion:', q._originalQuestion?.substring(0, 50) || 'NOT SET');
-        
-        // Map OpenTDB type to our type
-        const questionType = q.type === 'boolean' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE';
-        
-        // Map difficulty
-        const difficultyMap: Record<string, string> = {
-          easy: 'EASY',
-          medium: 'MEDIUM',
-          hard: 'HARD',
-        };
-        const difficulty = difficultyMap[q.difficulty.toLowerCase()] || 'MEDIUM';
-
-        // Build content based on type
-        // Also store original English text for duplicate detection
-        let content: any;
-        if (questionType === 'TRUE_FALSE') {
-          content = {
-            correctAnswer: q.correct_answer.toLowerCase() === 'true',
+    // Use a transaction to ensure atomicity:
+    // Either all questions + import log are created, or none
+    await prisma.$transaction(async (tx) => {
+      // Process each question
+      for (const q of questions as ImportQuestion[]) {
+        try {
+          // Debug: Log if _originalQuestion is present
+          console.log('[Import] Question:', q.question.substring(0, 50), '| _originalQuestion:', q._originalQuestion?.substring(0, 50) || 'NOT SET');
+          
+          // Map OpenTDB type to our type
+          const questionType = q.type === 'boolean' ? 'TRUE_FALSE' : 'MULTIPLE_CHOICE';
+          
+          // Map difficulty
+          const difficultyMap: Record<string, string> = {
+            easy: 'EASY',
+            medium: 'MEDIUM',
+            hard: 'HARD',
           };
-        } else {
-          content = {
-            correctAnswer: q.correct_answer,
-            incorrectAnswers: q.incorrect_answers,
-          };
+          const difficulty = difficultyMap[q.difficulty.toLowerCase()] || 'MEDIUM';
+
+          // Build content based on type
+          // Also store original English text for duplicate detection
+          let content: any;
+          if (questionType === 'TRUE_FALSE') {
+            content = {
+              correctAnswer: q.correct_answer.toLowerCase() === 'true',
+            };
+          } else {
+            content = {
+              correctAnswer: q.correct_answer,
+              incorrectAnswers: q.incorrect_answers,
+            };
+          }
+          
+          // Store original English text if available (for duplicate detection later)
+          if (q._originalQuestion) {
+            content._originalQuestion = q._originalQuestion;
+          }
+
+          // Generate a unique external ID based on ORIGINAL question content (English)
+          // This ensures we can detect duplicates even after translation
+          const originalText = q._originalQuestion || q.question;
+          const externalId = generateQuestionHash(originalText);
+
+          // Check for duplicates
+          const existing = await tx.question.findFirst({
+            where: {
+              OR: [
+                { source, externalId },
+                { text: q.question, categoryId },
+              ],
+            },
+          });
+
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          // Create the question
+          await tx.question.create({
+            data: {
+              categoryId,
+              text: q.question,
+              type: questionType as any,
+              difficulty: difficulty as any,
+              content,
+              source,
+              externalId,
+              isVerified: false, // Imported questions need verification
+              isActive: true,
+            },
+          });
+
+          added++;
+        } catch (err) {
+          failed++;
+          errors.push(`Frage "${q.question.substring(0, 50)}...": ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
         }
-        
-        // Store original English text if available (for duplicate detection later)
-        if (q._originalQuestion) {
-          content._originalQuestion = q._originalQuestion;
-        }
-
-        // Generate a unique external ID based on ORIGINAL question content (English)
-        // This ensures we can detect duplicates even after translation
-        const originalText = q._originalQuestion || q.question;
-        const externalId = generateQuestionHash(originalText);
-
-        // Check for duplicates
-        const existing = await prisma.question.findFirst({
-          where: {
-            OR: [
-              { source, externalId },
-              { text: q.question, categoryId },
-            ],
-          },
-        });
-
-        if (existing) {
-          skipped++;
-          continue;
-        }
-
-        // Create the question
-        await prisma.question.create({
-          data: {
-            categoryId,
-            text: q.question,
-            type: questionType as any,
-            difficulty: difficulty as any,
-            content,
-            source,
-            externalId,
-            isVerified: false, // Imported questions need verification
-            isActive: true,
-          },
-        });
-
-        added++;
-      } catch (err) {
-        failed++;
-        errors.push(`Frage "${q.question.substring(0, 50)}...": ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
       }
-    }
 
-    // Log the import
-    await prisma.importLog.create({
-      data: {
-        source,
-        filename: `gui_import_${new Date().toISOString()}`,
-        questionsAdded: added,
-        questionsSkipped: skipped,
-        questionsFailed: failed,
-        details: {
-          categoryId,
-          categoryName: category.name,
-          errors: errors.slice(0, 10), // Only store first 10 errors
+      // Log the import (inside transaction for atomicity)
+      await tx.importLog.create({
+        data: {
+          source,
+          filename: `gui_import_${new Date().toISOString()}`,
+          questionsAdded: added,
+          questionsSkipped: skipped,
+          questionsFailed: failed,
+          details: {
+            categoryId,
+            categoryName: category.name,
+            errors: errors.slice(0, 10), // Only store first 10 errors
+          },
         },
-      },
+      });
     });
 
     return NextResponse.json({
@@ -160,15 +165,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Generate a simple hash for duplicate detection
-function generateQuestionHash(text: string): string {
-  let hash = 0;
-  const str = text.toLowerCase().replace(/\s+/g, ' ').trim();
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return `hash_${Math.abs(hash).toString(16)}`;
-}
+// generateQuestionHash is now imported from @/lib/utils
 

@@ -73,37 +73,41 @@ export const SFX = {
 // ============================================
 
 /**
- * Vorbereitete TTS-Schnipsel gruppiert nach Kategorie.
- * Pro Kategorie mehrere Varianten für Abwechslung (zufällige Auswahl).
+ * Bekannte Snippet-Kategorien (Unterordner in public/audio/tts/).
+ * Neue Ordner werden automatisch erkannt - hier nur für Type-Safety eintragen.
  */
-export const TTS_SNIPPETS = {
-  correct: [
-    '/audio/tts/correct/001.mp3',
-    '/audio/tts/correct/002.mp3',
-    '/audio/tts/correct/003.mp3',
-    '/audio/tts/correct/004.mp3',
-    '/audio/tts/correct/005.mp3',
-    '/audio/tts/correct/006.mp3',
-    '/audio/tts/correct/007.mp3',
-  ],
-  wrong: [
-    '/audio/tts/wrong/001.mp3',
-    '/audio/tts/wrong/002.mp3',
-    '/audio/tts/wrong/003.mp3',
-    '/audio/tts/wrong/004.mp3',
-    '/audio/tts/wrong/005.mp3',
-    '/audio/tts/wrong/006.mp3',
-    '/audio/tts/wrong/007.mp3',
-    '/audio/tts/wrong/008.mp3',
-  ],
-  welcome: [
-    '/audio/tts/welcome/001.mp3',
-    '/audio/tts/welcome/002.mp3',
-    '/audio/tts/welcome/003.mp3',
-    '/audio/tts/welcome/004.mp3',
-    '/audio/tts/welcome/005.mp3',
-  ],
-} as const;
+export const TTS_SNIPPET_CATEGORIES = ['correct', 'wrong', 'welcome'] as const;
+export type TtsSnippetCategory = (typeof TTS_SNIPPET_CATEGORIES)[number];
+
+/**
+ * Dynamisch befüllte Snippet-Registry.
+ * Wird beim App-Start via /api/tts-snippets geladen.
+ * Einfach MP3-Dateien in public/audio/tts/<kategorie>/ ablegen - fertig!
+ */
+export const TTS_SNIPPETS: Record<string, string[]> = {};
+
+/**
+ * Lädt alle TTS-Snippets vom Server (scannt public/audio/tts/ Ordner).
+ * Wird einmalig beim AudioManager-Init aufgerufen.
+ */
+export async function loadTtsSnippets(): Promise<void> {
+  try {
+    const res = await fetch('/api/tts-snippets');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data: Record<string, string[]> = await res.json();
+
+    // Bestehende Keys leeren und neu befüllen
+    for (const key of Object.keys(TTS_SNIPPETS)) {
+      delete TTS_SNIPPETS[key];
+    }
+    Object.assign(TTS_SNIPPETS, data);
+
+    const total = Object.values(data).reduce((sum, arr) => sum + arr.length, 0);
+    console.log(`[AudioRegistry] ${total} TTS-Snippets geladen aus ${Object.keys(data).length} Kategorien`);
+  } catch (error) {
+    console.warn('[AudioRegistry] TTS-Snippets konnten nicht geladen werden:', error);
+  }
+}
 
 // ============================================
 // TYPE HELPERS
@@ -111,4 +115,3 @@ export const TTS_SNIPPETS = {
 
 export type MusicKey = keyof typeof MUSIC;
 export type SfxKey = keyof typeof SFX;
-export type TtsSnippetCategory = keyof typeof TTS_SNIPPETS;

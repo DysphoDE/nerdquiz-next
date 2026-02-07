@@ -7,7 +7,7 @@
  */
 
 import { Howl, Howler } from 'howler';
-import { MUSIC, SFX, TTS_SNIPPETS, type MusicKey, type SfxKey, type TtsSnippetCategory } from '@/config/audioRegistry';
+import { MUSIC, SFX, TTS_SNIPPETS, loadTtsSnippets, type MusicKey, type SfxKey, type TtsSnippetCategory } from '@/config/audioRegistry';
 import {
   TTS_CONFIG,
   TTS_INSTRUCTIONS,
@@ -87,6 +87,10 @@ class AudioManager {
   // Track failed loads to avoid repeated attempts
   private failedLoads: Set<string> = new Set();
 
+  // Whether TTS snippets have been loaded
+  private snippetsLoaded = false;
+  private snippetsLoadingPromise: Promise<void> | null = null;
+
   private constructor() {
     // Private constructor for singleton
   }
@@ -96,6 +100,21 @@ class AudioManager {
       AudioManager.instance = new AudioManager();
     }
     return AudioManager.instance;
+  }
+
+  /**
+   * Lädt TTS-Snippets vom Server (einmalig).
+   * Wird automatisch von useAudioInit aufgerufen.
+   */
+  async loadSnippets(): Promise<void> {
+    if (this.snippetsLoaded) return;
+    if (this.snippetsLoadingPromise) return this.snippetsLoadingPromise;
+
+    this.snippetsLoadingPromise = loadTtsSnippets().then(() => {
+      this.snippetsLoaded = true;
+    });
+
+    return this.snippetsLoadingPromise;
   }
 
   // ============================================
@@ -389,7 +408,11 @@ class AudioManager {
    * @param category - Die Snippet-Kategorie (z.B. 'correct', 'wrong', 'welcome')
    */
   playModeratorSnippet(category: TtsSnippetCategory): void {
-    const files = TTS_SNIPPETS[category] as readonly string[];
+    const files = TTS_SNIPPETS[category];
+    if (!files || files.length === 0) {
+      console.warn(`[AudioManager] No snippets loaded for category "${category}"`);
+      return;
+    }
     const fileCount = files.length;
 
     // Pick a random index, avoiding the last one played

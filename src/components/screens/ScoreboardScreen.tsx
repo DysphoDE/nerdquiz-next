@@ -16,7 +16,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, useIsHost, usePlayers } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { useAudio } from '@/hooks/useAudio';
 
@@ -72,23 +72,43 @@ export function ScoreboardScreen() {
     playMusic('scoreboard');
   }, [playMusic]);
   
+  // Track previous scores & ranks to calculate real rank changes
+  const previousSnapshotRef = useRef<Map<string, { score: number; rank: number }> | null>(null);
+  
   // Sort and calculate rank changes
   const players: PlayerWithRankChange[] = useMemo(() => {
     const sorted = [...unsortedPlayers].sort((a, b) => b.score - a.score);
+    const previousSnapshot = previousSnapshotRef.current;
     
-    return sorted.map((player, index) => {
-      // In real implementation, you'd track previous scores
-      // For now, we'll simulate based on streaks
-      const scoreGained = player.streak > 0 ? Math.floor(Math.random() * 300) + 100 : 0;
-      const rankChange = player.streak > 1 ? 'up' : player.streak === 0 && index > 0 ? 'down' : 'same';
+    const result = sorted.map((player, index) => {
+      const currentRank = index + 1;
+      const prev = previousSnapshot?.get(player.id);
+      const previousScore = prev?.score ?? player.score;
+      const previousRank = prev?.rank ?? currentRank;
+      const scoreGained = player.score - previousScore;
+      
+      let rankChange: 'up' | 'down' | 'same' = 'same';
+      if (previousSnapshot) {
+        if (currentRank < previousRank) rankChange = 'up';
+        else if (currentRank > previousRank) rankChange = 'down';
+      }
       
       return {
         ...player,
-        currentRank: index + 1,
+        previousScore,
+        currentRank,
+        previousRank,
         rankChange,
         scoreGained,
       };
     });
+    
+    // Save current snapshot for next scoreboard visit
+    const newSnapshot = new Map<string, { score: number; rank: number }>();
+    result.forEach(p => newSnapshot.set(p.id, { score: p.score, rank: p.currentRank }));
+    previousSnapshotRef.current = newSnapshot;
+    
+    return result;
   }, [unsortedPlayers]);
 
   const handleNext = () => {

@@ -117,8 +117,8 @@ export const HOT_BUTTON_TIMING = {
  * Collective List Bonus Round Timings
  */
 export const COLLECTIVE_LIST_TIMING = {
-  /** Intro-Dauer (3s) */
-  INTRO: 3000,
+  /** Intro-Dauer (5s) - TTS-Moderator spricht ggf. weiter in die Spielphase hinein */
+  INTRO: 10000,
   
   /** Zeit pro Spieler-Zug (15s) */
   TURN_DURATION: 15000,

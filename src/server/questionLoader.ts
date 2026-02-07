@@ -12,10 +12,9 @@
  */
 
 import { PrismaClient, QuestionType } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
+import { prisma as sharedPrisma } from '@/lib/db';
 import { 
   isMultipleChoiceContent, 
   isEstimationContent,
@@ -32,19 +31,11 @@ import {
   BONUS_ROUND_THRESHOLDS,
   MATCHING,
 } from '@/config/constants';
+import type { GameQuestion, Difficulty } from './types';
 
-// Initialize Prisma Client for server (Prisma 7 with adapter)
-let prisma: PrismaClient | null = null;
-
-try {
-  if (process.env.DATABASE_URL) {
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-    const adapter = new PrismaPg(pool);
-    prisma = new PrismaClient({ adapter });
-  }
-} catch (error) {
-  console.warn('⚠️ Database not configured, using JSON fallback');
-}
+// Use shared Prisma singleton from lib/db.ts
+// Falls back to null if DATABASE_URL is not set
+const prisma: PrismaClient | null = sharedPrisma || null;
 
 // ============================================
 // TYPES
@@ -77,21 +68,8 @@ function fisherYatesShuffle<T>(array: T[]): T[] {
   return shuffled;
 }
 
-type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
-
-interface GameQuestion {
-  id: string;
-  text: string;
-  type: 'choice' | 'estimation';
-  answers?: string[];
-  correctIndex?: number;
-  correctValue?: number;
-  unit?: string;
-  category: string;
-  categoryIcon: string;
-  // Difficulty for dev-mode quick editing
-  difficulty?: Difficulty;
-}
+// GameQuestion and Difficulty types are imported from ./types
+// This ensures a single source of truth for these types
 
 // ============================================
 // JSON FALLBACK (existing implementation)

@@ -51,3 +51,4 @@ thumbnail.png
 
 # TTS cache (generierte Sprachdateien pro Frage)
 /public/audio/tts-cache
+CODEBASE_AUDIT_CLAUDE.md

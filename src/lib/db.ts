@@ -28,16 +28,17 @@ function createPrismaClient() {
   const pool = globalForPrisma.pool ?? new pg.Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.pool = pool;
-  }
+  // Pool immer global speichern um Connection Pool Exhaustion zu vermeiden
+  // (auch in Production, da Next.js Module bei Serverless Cold Starts neu laden kann)
+  globalForPrisma.pool = pool;
   
   return new PrismaClient({ adapter });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== 'production' && prisma) {
+// Prisma-Instanz immer global speichern um doppelte Instanzen zu vermeiden
+if (prisma) {
   globalForPrisma.prisma = prisma;
 }
 

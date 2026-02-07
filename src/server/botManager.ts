@@ -87,12 +87,14 @@ class BotManager {
    * Clear all timers for a specific bot
    */
   private clearBotTimers(botId: string) {
+    const keysToDelete: string[] = [];
     for (const [key, timer] of this.activeTimers) {
       if (key.startsWith(botId)) {
         clearTimeout(timer);
-        this.activeTimers.delete(key);
+        keysToDelete.push(key);
       }
     }
+    keysToDelete.forEach(key => this.activeTimers.delete(key));
   }
 
   /**

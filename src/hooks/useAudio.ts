@@ -109,6 +109,11 @@ export function useAudioInit() {
     };
   }, [masterVolume]);
 
+  // Load TTS snippets from server (scans public/audio/tts/ folder)
+  useEffect(() => {
+    audioManager.loadSnippets();
+  }, []);
+
   // NOTE: No stopAll() on unmount!
   // The AudioManager is a singleton that persists across screen transitions.
   // Music should continue playing across phase changes (e.g. lobby → game).

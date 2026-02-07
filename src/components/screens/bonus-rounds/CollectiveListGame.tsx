@@ -447,7 +447,7 @@ export function CollectiveListGame() {
   const { submitCollectiveListAnswer, skipCollectiveListTurn } = useSocket();
   const { room, playerId, collectiveListResult } = useGameStore();
   const players = usePlayers();
-  const { playMusic, playSfx } = useAudio();
+  const { playMusic, playSfx, playTTS } = useAudio();
   
   const [inputValue, setInputValue] = useState('');
   const [lastResult, setLastResult] = useState<'correct' | 'wrong' | 'already_guessed' | null>(null);
@@ -485,6 +485,19 @@ export function CollectiveListGame() {
   useEffect(() => {
     playMusic('bonusRound');
   }, [playMusic]);
+
+  // TTS: Bonusrunden-Beschreibung vorlesen in der Intro-Phase
+  // Kein stopTTS() — der Moderator spricht weiter, auch wenn die Spielphase schon startet
+  useEffect(() => {
+    if (isIntro && bonusRound?.description) {
+      const ttsText = bonusRound.topic
+        ? `${bonusRound.topic}! ${bonusRound.description}`
+        : bonusRound.description;
+      playTTS(ttsText, {
+        instructionKey: 'ANNOUNCEMENT',
+      });
+    }
+  }, [isIntro, bonusRound?.topic, bonusRound?.description, playTTS]);
 
   // Play SFX for correct/wrong answers
   useEffect(() => {
@@ -793,27 +806,50 @@ export function CollectiveListGame() {
         {/* Intro + Playing + Finished Phase - unified flow */}
         {(isIntro || isPlaying || isFinished) && (
           <>
-            {/* Big Description Card - always visible, smaller on mobile */}
+            {/* Big Description Card - always visible, larger during intro */}
             {bonusRound.description && !isFinished && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3 }}
+                layout
                 className="mb-4 sm:mb-6"
               >
-                <Card className="glass p-3 sm:p-6 border-amber-500/30 bg-amber-500/5">
-                  <div className="flex items-start gap-2 sm:gap-4">
+                <Card className={cn(
+                  "glass border-amber-500/30 bg-amber-500/5 transition-all",
+                  isIntro ? "p-5 sm:p-8" : "p-3 sm:p-6"
+                )}>
+                  <div className={cn(
+                    "flex gap-2 sm:gap-4",
+                    isIntro ? "flex-col items-center text-center sm:flex-row sm:items-start sm:text-left" : "items-start"
+                  )}>
                     <motion.div
                       animate={{ rotate: [0, 10, -10, 0] }}
                       transition={{ repeat: Infinity, duration: 2 }}
-                      className="text-2xl sm:text-4xl shrink-0"
+                      className={cn(
+                        "shrink-0",
+                        isIntro ? "text-4xl sm:text-5xl" : "text-2xl sm:text-4xl"
+                      )}
                     >
                       📋
                     </motion.div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-base sm:text-xl font-bold text-amber-500 mb-1 sm:mb-2 truncate">{bonusRound.topic}</h3>
-                      <p className="text-sm sm:text-lg text-foreground line-clamp-2 sm:line-clamp-none">{bonusRound.description}</p>
-                      <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3 text-xs sm:text-sm text-muted-foreground">
+                      <h3 className={cn(
+                        "font-bold text-amber-500 mb-1 sm:mb-2",
+                        isIntro ? "text-xl sm:text-2xl" : "text-base sm:text-xl truncate"
+                      )}>
+                        {bonusRound.topic}
+                      </h3>
+                      <p className={cn(
+                        "text-foreground",
+                        isIntro ? "text-base sm:text-xl leading-relaxed" : "text-sm sm:text-lg line-clamp-2 sm:line-clamp-none"
+                      )}>
+                        {bonusRound.description}
+                      </p>
+                      <div className={cn(
+                        "flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3 text-muted-foreground",
+                        isIntro ? "text-sm sm:text-base justify-center sm:justify-start" : "text-xs sm:text-sm"
+                      )}>
                         <span className="px-1.5 sm:px-2 py-0.5 glass rounded-full">{bonusRound.totalItems} Begriffe</span>
                         <span className="px-1.5 sm:px-2 py-0.5 glass rounded-full">{bonusRound.timePerTurn}s/Zug</span>
                         <span className="px-1.5 sm:px-2 py-0.5 glass rounded-full">+{bonusRound.pointsPerCorrect}P</span>
@@ -824,21 +860,69 @@ export function CollectiveListGame() {
               </motion.div>
             )}
 
-            {/* Intro waiting indicator */}
+            {/* Intro: Spielregeln erklären */}
             {isIntro && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex justify-center mb-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="mb-4"
               >
-                <div className="flex items-center gap-3 px-6 py-3 glass rounded-xl">
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                    className="w-3 h-3 rounded-full bg-amber-500"
-                  />
-                  <span className="text-muted-foreground font-medium">Gleich geht's los...</span>
-                </div>
+                <Card className="glass p-4 sm:p-6 border-amber-500/20">
+                  <div className="space-y-3 sm:space-y-4">
+                    {/* Regeln als kompakte Liste */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <div className="flex items-center gap-2 text-sm sm:text-base">
+                        <span className="text-lg">🔄</span>
+                        <span className="text-muted-foreground">Reihum Begriffe nennen</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm sm:text-base">
+                        <span className="text-lg">⏱️</span>
+                        <span className="text-muted-foreground">Nur <strong className="text-foreground">{bonusRound.timePerTurn}s</strong> pro Zug</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm sm:text-base">
+                        <span className="text-lg">💀</span>
+                        <span className="text-muted-foreground">Falsch oder zu langsam = raus!</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm sm:text-base">
+                        <span className="text-lg">🏆</span>
+                        <span className="text-muted-foreground">Letzter Spieler gewinnt</span>
+                      </div>
+                    </div>
+
+                    {/* Startspieler-Hinweis */}
+                    {(() => {
+                      const firstPlayerId = bonusRound.turnOrder?.[0];
+                      const firstPlayer = firstPlayerId ? players.find(p => p.id === firstPlayerId) : null;
+                      if (!firstPlayer) return null;
+                      return (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.8 }}
+                          className="flex items-center justify-center gap-2 pt-1"
+                        >
+                          <GameAvatar seed={firstPlayer.avatarSeed} mood="hopeful" size="xs" className="border border-amber-500/50" />
+                          <p className="text-sm sm:text-base text-muted-foreground">
+                            Es beginnt <strong className="text-amber-500">{firstPlayer.name}</strong>. Macht euch bereit!
+                          </p>
+                        </motion.div>
+                      );
+                    })()}
+
+                    {/* Countdown-Balken */}
+                    <div className="pt-1">
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full"
+                          initial={{ width: '100%' }}
+                          animate={{ width: '0%' }}
+                          transition={{ duration: 10, ease: 'linear' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               </motion.div>
             )}
 

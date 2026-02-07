@@ -12,6 +12,7 @@ import type {
   Player,
   GameSettings,
 } from './types';
+import type { RoomState } from '@/types/game';
 import { createInitialGameState, DEFAULT_GAME_SETTINGS } from './types';
 import { botManager } from './botManager';
 import {
@@ -206,7 +207,7 @@ export function resetPlayerScores(room: GameRoom): void {
  * Konvertiert ein GameRoom-Objekt in ein Client-sicheres Format
  * Maps werden zu Objects konvertiert, sensitive Daten werden entfernt
  */
-export function roomToClient(room: GameRoom): Record<string, any> {
+export function roomToClient(room: GameRoom): RoomState {
   const players = Array.from(room.players.values()).map(p => ({
     id: p.id,
     name: p.name,
@@ -257,7 +258,7 @@ export function roomToClient(room: GameRoom): Record<string, any> {
 
     if (br.type === 'collective_list') {
       bonusRoundClient = {
-        type: 'collective_list',
+        type: 'collective_list' as const,
         phase: br.phase,
         questionId: br.questionId,
         topic: br.topic,
@@ -300,7 +301,7 @@ export function roomToClient(room: GameRoom): Record<string, any> {
       const currentQuestion = br.questions[br.currentQuestionIndex];
       const questionTextLength = currentQuestion?.text.length || 1;
       bonusRoundClient = {
-        type: 'hot_button',
+        type: 'hot_button' as const,
         phase: br.phase,
         questionId: br.questionId,
         topic: br.topic,

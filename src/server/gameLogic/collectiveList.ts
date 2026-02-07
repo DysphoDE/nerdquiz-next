@@ -418,11 +418,15 @@ export function eliminateCollectiveListPlayer(
     return;
   }
 
-  // Adjust turn index if needed
-  if (playerIndex <= bonusRound.currentTurnIndex) {
-    bonusRound.currentTurnIndex = Math.max(0, bonusRound.currentTurnIndex - 1);
+  // Adjust turn index if needed (defensive: guard against empty activePlayers)
+  if (bonusRound.activePlayers.length > 0) {
+    if (playerIndex <= bonusRound.currentTurnIndex) {
+      bonusRound.currentTurnIndex = Math.max(0, bonusRound.currentTurnIndex - 1);
+    }
+    bonusRound.currentTurnIndex = bonusRound.currentTurnIndex % bonusRound.activePlayers.length;
+  } else {
+    bonusRound.currentTurnIndex = 0;
   }
-  bonusRound.currentTurnIndex = bonusRound.currentTurnIndex % bonusRound.activePlayers.length;
 
   broadcastRoomUpdate(room, io);
 
