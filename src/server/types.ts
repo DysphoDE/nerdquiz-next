@@ -353,6 +353,9 @@ export interface GameRoom {
   // Game start animation: server waits for client to finish overlay before starting timers
   gameStartReadyCallback?: () => void;
   gameStartReadyTimeout?: NodeJS.Timeout;
+  // Bonus round intro: server waits for client TTS to finish before starting turns
+  introReadyCallback?: () => void;
+  introReadyTimeout?: NodeJS.Timeout;
 }
 
 // ============================================

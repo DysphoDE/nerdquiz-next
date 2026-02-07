@@ -76,7 +76,7 @@ export const SFX = {
  * Bekannte Snippet-Kategorien (Unterordner in public/audio/tts/).
  * Neue Ordner werden automatisch erkannt - hier nur für Type-Safety eintragen.
  */
-export const TTS_SNIPPET_CATEGORIES = ['correct', 'wrong', 'welcome'] as const;
+export const TTS_SNIPPET_CATEGORIES = ['correct', 'wrong', 'welcome', 'list-intro'] as const;
 export type TtsSnippetCategory = (typeof TTS_SNIPPET_CATEGORIES)[number];
 
 /**

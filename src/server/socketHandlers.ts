@@ -165,6 +165,22 @@ export function setupSocketHandlers(io: SocketServer): void {
       callback();
     });
 
+    // === COLLECTIVE LIST INTRO DONE (client TTS finished) ===
+    socket.on('collective_list_intro_done', (data: { roomCode: string }) => {
+      if (!data?.roomCode) return;
+      const room = getRoom(data.roomCode);
+      if (!room?.introReadyCallback) return;
+
+      console.log(`📋 Collective List intro done received for room ${room.code}`);
+      if (room.introReadyTimeout) {
+        clearTimeout(room.introReadyTimeout);
+        room.introReadyTimeout = undefined;
+      }
+      const callback = room.introReadyCallback;
+      room.introReadyCallback = undefined;
+      callback();
+    });
+
     // === TIME SYNC ===
     socket.on('time_sync_request', (data: { clientTime: number }) => {
       handleTimeSyncRequest(socket, data.clientTime);

@@ -78,6 +78,9 @@ class AudioManager {
   private ttsAbortController: AbortController | null = null;
   private ttsLoading = false;
 
+  // Currently playing snippet (to prevent overlapping snippet playback)
+  private currentSnippetHowl: Howl | null = null;
+
   // Volume state (synced from audioStore via useAudio hook)
   private masterVolume = 0.5;
   private musicVolume = 0.1;
@@ -409,6 +412,9 @@ class AudioManager {
    * @returns Promise die resolved wenn die Wiedergabe beendet ist
    */
   playModeratorSnippet(category: TtsSnippetCategory): Promise<void> {
+    // Stop any currently playing snippet to prevent overlapping playback
+    this.stopCurrentSnippet();
+
     return new Promise<void>((resolve) => {
       const files = TTS_SNIPPETS[category];
       if (!files || files.length === 0) {
@@ -458,12 +464,31 @@ class AudioManager {
       // Update volume before playing (in case it changed)
       howl.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS);
 
+      // Track this as the current snippet
+      this.currentSnippetHowl = howl;
+
       // Resolve when playback finishes (or on error)
-      howl.once('end', () => resolve());
-      howl.once('playerror', () => resolve());
+      howl.once('end', () => {
+        this.currentSnippetHowl = null;
+        resolve();
+      });
+      howl.once('playerror', () => {
+        this.currentSnippetHowl = null;
+        resolve();
+      });
 
       howl.play();
     });
+  }
+
+  /**
+   * Stoppt den aktuell laufenden Moderator-Snippet-Clip.
+   */
+  private stopCurrentSnippet(): void {
+    if (this.currentSnippetHowl) {
+      this.currentSnippetHowl.stop();
+      this.currentSnippetHowl = null;
+    }
   }
 
   /**
@@ -580,6 +605,7 @@ class AudioManager {
     this.pendingMusic = null;
     this.stopMusic(0);
     this.stopTTS();
+    this.stopCurrentSnippet();
     Howler.stop();
   }
 

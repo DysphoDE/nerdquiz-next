@@ -24,6 +24,7 @@ import {
   COLLECTIVE_LIST_TIMING,
   COLLECTIVE_LIST_SCORING,
   MATCHING,
+  UI_TIMING,
 } from '@/config/constants';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -79,15 +80,25 @@ export function startCollectiveListRound(room: GameRoom, io: SocketServer, confi
   emitPhaseChange(room, io, 'bonus_round');
   broadcastRoomUpdate(room, io);
 
-  // After intro delay, start playing
-  setTimeout(() => {
+  // Wait for client to signal that intro TTS is done (with fallback timeout)
+  const startPlaying = () => {
     const { getRoom } = require('../roomStore');
     const currentRoom = getRoom(roomCode);
     if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'collective_list' && currentRoom.state.bonusRound.phase === 'intro') {
       currentRoom.state.bonusRound.phase = 'playing';
       startCollectiveListTurn(currentRoom, io);
     }
-  }, COLLECTIVE_LIST_TIMING.INTRO);
+  };
+
+  room.introReadyCallback = startPlaying;
+  room.introReadyTimeout = setTimeout(() => {
+    if (room.introReadyCallback) {
+      console.log(`⏰ Collective List intro timeout reached for room ${roomCode}, starting anyway`);
+      room.introReadyCallback();
+      room.introReadyCallback = undefined;
+      room.introReadyTimeout = undefined;
+    }
+  }, 30000); // 30s generous fallback
 }
 
 // ============================================

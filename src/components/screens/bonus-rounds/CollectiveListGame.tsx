@@ -24,6 +24,7 @@ import { GameAvatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useAudio } from '@/hooks/useAudio';
 import type { CollectiveListBonusRound } from '@/types/game';
+import type { TtsSnippetCategory } from '@/config/audioRegistry';
 
 // ============================================
 // TURN INDICATOR MIT ZÜNDSCHNUR
@@ -444,10 +445,10 @@ function TurnIndicatorWithFuse({
  * Der letzte verbleibende Spieler gewinnt.
  */
 export function CollectiveListGame() {
-  const { submitCollectiveListAnswer, skipCollectiveListTurn } = useSocket();
+  const { submitCollectiveListAnswer, skipCollectiveListTurn, emitCollectiveListIntroDone } = useSocket();
   const { room, playerId, collectiveListResult } = useGameStore();
   const players = usePlayers();
-  const { playMusic, playSfx, playTTS } = useAudio();
+  const { playMusic, playSfx, playTTS, playModeratorSnippet } = useAudio();
   
   const [inputValue, setInputValue] = useState('');
   const [lastResult, setLastResult] = useState<'correct' | 'wrong' | 'already_guessed' | null>(null);
@@ -486,18 +487,50 @@ export function CollectiveListGame() {
     playMusic('bonusRound');
   }, [playMusic]);
 
-  // TTS: Bonusrunden-Beschreibung vorlesen in der Intro-Phase
-  // Kein stopTTS() — der Moderator spricht weiter, auch wenn die Spielphase schon startet
+  // === INTRO SUB-PHASES ===
+  // 'rules'  → Show game explanation + play list-intro snippet
+  // 'topic'  → Reveal question/topic + play TTS reading it
+  // 'done'   → TTS finished, waiting for server to start game
+  const [introSubPhase, setIntroSubPhase] = useState<'rules' | 'topic' | 'done'>('rules');
+  const introSignalSent = useRef(false);
+  const introSnippetStarted = useRef(false);
+
+  // Phase 1: Play list-intro snippet when entering intro
+  // Ref guard prevents React Strict Mode double-execution
   useEffect(() => {
-    if (isIntro && bonusRound?.description) {
+    if (isIntro && introSubPhase === 'rules' && !introSnippetStarted.current) {
+      introSnippetStarted.current = true;
+      playModeratorSnippet('list-intro' as TtsSnippetCategory)
+        .then(() => {
+          setIntroSubPhase('topic');
+        });
+    }
+  }, [isIntro, introSubPhase, playModeratorSnippet]);
+
+  // Phase 2: Play TTS reading the question when topic sub-phase starts
+  useEffect(() => {
+    if (isIntro && introSubPhase === 'topic' && bonusRound?.description) {
+      const startTime = Date.now();
+      const MIN_DISPLAY_MS = 5000; // Minimum 5 seconds to read the question
+
       const ttsText = bonusRound.topic
         ? `${bonusRound.topic}! ${bonusRound.description}`
         : bonusRound.description;
-      playTTS(ttsText, {
-        instructionKey: 'ANNOUNCEMENT',
-      });
+
+      playTTS(ttsText, { instructionKey: 'ANNOUNCEMENT' })
+        .then(() => {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
+          setTimeout(() => {
+            setIntroSubPhase('done');
+            if (!introSignalSent.current) {
+              introSignalSent.current = true;
+              emitCollectiveListIntroDone();
+            }
+          }, remaining);
+        });
     }
-  }, [isIntro, bonusRound?.topic, bonusRound?.description, playTTS]);
+  }, [isIntro, introSubPhase, bonusRound?.topic, bonusRound?.description, playTTS, emitCollectiveListIntroDone]);
 
   // Play SFX for correct/wrong answers
   useEffect(() => {
@@ -806,12 +839,12 @@ export function CollectiveListGame() {
         {/* Intro + Playing + Finished Phase - unified flow */}
         {(isIntro || isPlaying || isFinished) && (
           <>
-            {/* Big Description Card - always visible, larger during intro */}
-            {bonusRound.description && !isFinished && (
+            {/* Big Description Card - hidden during rules sub-phase, shown during topic + playing */}
+            {bonusRound.description && !isFinished && !(isIntro && introSubPhase === 'rules') && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.4 }}
                 layout
                 className="mb-4 sm:mb-6"
               >
@@ -860,36 +893,91 @@ export function CollectiveListGame() {
               </motion.div>
             )}
 
-            {/* Intro: Spielregeln erklären */}
-            {isIntro && (
+            {/* Intro Sub-Phase: Rules - Ausführliche Spielerklärung */}
+            {isIntro && introSubPhase === 'rules' && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.5 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="mb-4"
+              >
+                <Card className="glass p-5 sm:p-8 border-amber-500/20">
+                  <div className="space-y-4 sm:space-y-5">
+                    <div className="text-center">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                        className="text-5xl mb-3"
+                      >
+                        📋
+                      </motion.div>
+                      <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+                        SAMMELLISTE
+                      </h2>
+                      <p className="text-muted-foreground mt-1 text-sm sm:text-base">So funktioniert&apos;s:</p>
+                    </div>
+
+                    <div className="space-y-2.5 sm:space-y-3">
+                      <div className="flex items-start gap-3 text-sm sm:text-base">
+                        <span className="text-lg mt-0.5 shrink-0">🔄</span>
+                        <span className="text-muted-foreground">Ihr nennt <strong className="text-foreground">reihum Begriffe</strong> zu einem vorgegebenen Thema.</span>
+                      </div>
+                      <div className="flex items-start gap-3 text-sm sm:text-base">
+                        <span className="text-lg mt-0.5 shrink-0">⏱️</span>
+                        <span className="text-muted-foreground">Pro Zug habt ihr nur <strong className="text-foreground">{bonusRound.timePerTurn} Sekunden</strong> Zeit.</span>
+                      </div>
+                      <div className="flex items-start gap-3 text-sm sm:text-base">
+                        <span className="text-lg mt-0.5 shrink-0">💀</span>
+                        <span className="text-muted-foreground">Wer einen <strong className="text-foreground">falschen Begriff</strong> nennt, zu langsam ist oder passt, fliegt raus!</span>
+                      </div>
+                      <div className="flex items-start gap-3 text-sm sm:text-base">
+                        <span className="text-lg mt-0.5 shrink-0">✏️</span>
+                        <span className="text-muted-foreground">Keine Sorge: <strong className="text-foreground">Tippfehler werden toleriert</strong>.</span>
+                      </div>
+                      <div className="flex items-start gap-3 text-sm sm:text-base">
+                        <span className="text-lg mt-0.5 shrink-0">🏆</span>
+                        <span className="text-muted-foreground">Der <strong className="text-foreground">letzte Spieler im Spiel</strong> gewinnt die meisten Punkte!</span>
+                      </div>
+                    </div>
+
+                    {/* Equalizer bars while moderator snippet plays */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="flex items-end justify-center gap-1 pt-2 h-8"
+                    >
+                      {[0, 1, 2, 3, 4].map((i) => (
+                        <motion.div
+                          key={i}
+                          className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                          animate={{ height: ['6px', `${12 + (i % 3) * 5}px`, '6px'] }}
+                          transition={{
+                            duration: 0.5 + i * 0.1,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                            delay: i * 0.08,
+                          }}
+                        />
+                      ))}
+                    </motion.div>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Intro Sub-Phase: Topic - Frage/Thema wird revealed */}
+            {isIntro && (introSubPhase === 'topic' || introSubPhase === 'done') && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
                 className="mb-4"
               >
                 <Card className="glass p-4 sm:p-6 border-amber-500/20">
                   <div className="space-y-3 sm:space-y-4">
-                    {/* Regeln als kompakte Liste */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                      <div className="flex items-center gap-2 text-sm sm:text-base">
-                        <span className="text-lg">🔄</span>
-                        <span className="text-muted-foreground">Reihum Begriffe nennen</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm sm:text-base">
-                        <span className="text-lg">⏱️</span>
-                        <span className="text-muted-foreground">Nur <strong className="text-foreground">{bonusRound.timePerTurn}s</strong> pro Zug</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm sm:text-base">
-                        <span className="text-lg">💀</span>
-                        <span className="text-muted-foreground">Falsch oder zu langsam = raus!</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm sm:text-base">
-                        <span className="text-lg">🏆</span>
-                        <span className="text-muted-foreground">Letzter Spieler gewinnt</span>
-                      </div>
-                    </div>
-
                     {/* Startspieler-Hinweis */}
                     {(() => {
                       const firstPlayerId = bonusRound.turnOrder?.[0];
@@ -899,27 +987,45 @@ export function CollectiveListGame() {
                         <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          transition={{ delay: 0.8 }}
-                          className="flex items-center justify-center gap-2 pt-1"
+                          transition={{ delay: 0.3 }}
+                          className="flex items-center justify-center gap-2"
                         >
                           <GameAvatar seed={firstPlayer.avatarSeed} mood="hopeful" size="xs" className="border border-amber-500/50" />
                           <p className="text-sm sm:text-base text-muted-foreground">
-                            Es beginnt <strong className="text-amber-500">{firstPlayer.name}</strong>. Macht euch bereit!
+                            Es beginnt <strong className="text-amber-500">{firstPlayer.name}</strong>
                           </p>
                         </motion.div>
                       );
                     })()}
 
-                    {/* Countdown-Balken */}
-                    <div className="pt-1">
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full"
-                          initial={{ width: '100%' }}
-                          animate={{ width: '0%' }}
-                          transition={{ duration: 10, ease: 'linear' }}
-                        />
-                      </div>
+                    {/* Status indicator */}
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                      {introSubPhase === 'done' ? (
+                        <motion.span
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: [0.5, 1, 0.5] }}
+                          transition={{ repeat: Infinity, duration: 1.2 }}
+                        >
+                          Gleich geht&apos;s los...
+                        </motion.span>
+                      ) : (
+                        /* Equalizer bars while TTS plays */
+                        <div className="flex items-end justify-center gap-1 h-6">
+                          {[0, 1, 2, 3, 4].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                              animate={{ height: ['6px', `${12 + (i % 3) * 5}px`, '6px'] }}
+                              transition={{
+                                duration: 0.5 + i * 0.1,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: i * 0.08,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Card>

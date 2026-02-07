@@ -144,9 +144,8 @@ export function useAudio() {
     audioManager.playSfx(key);
   }, []);
 
-  const playTTS = useCallback((text: string, options?: PlayTTSOptions) => {
-    // Fire-and-forget (errors are logged by AudioManager)
-    audioManager.playTTS(text, options).catch(() => {});
+  const playTTS = useCallback((text: string, options?: PlayTTSOptions): Promise<void> => {
+    return audioManager.playTTS(text, options).catch(() => {});
   }, []);
 
   const stopTTS = useCallback(() => {
