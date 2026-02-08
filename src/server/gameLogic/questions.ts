@@ -438,10 +438,10 @@ export function showEstimationAnswer(room: GameRoom, io: SocketServer): void {
       if (a.absDiff !== b.absDiff) {
         return a.absDiff - b.absDiff;
       }
-      // Tiebreaker: faster answer wins (lower answerTime = faster)
-      const timeA = a.player.answerTime ?? Infinity;
-      const timeB = b.player.answerTime ?? Infinity;
-      return timeA - timeB;
+      // Tiebreaker: faster answer wins (higher answerTime = more time left = faster)
+      const timeA = a.player.answerTime ?? -Infinity;
+      const timeB = b.player.answerTime ?? -Infinity;
+      return timeB - timeA;
     });
 
   const results: AnswerResult[] = [];

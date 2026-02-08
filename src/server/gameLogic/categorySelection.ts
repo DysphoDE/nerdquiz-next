@@ -281,11 +281,19 @@ export async function finalizeCategoryVoting(room: GameRoom, io: SocketServer): 
  */
 export function startCategoryWheel(room: GameRoom, io: SocketServer): void {
   const roomCode = room.code; // Capture for timer
-  room.state.phase = 'category_wheel';
   
   // The wheel shows max 8 categories
   const WHEEL_SEGMENTS = 8;
   const wheelCategories = room.state.votingCategories.slice(0, WHEEL_SEGMENTS);
+  
+  // Guard: If no categories available, fall back to voting
+  if (wheelCategories.length === 0) {
+    console.warn(`⚠️ No categories available for wheel in room ${roomCode}, falling back to voting`);
+    startCategoryVoting(room, io);
+    return;
+  }
+
+  room.state.phase = 'category_wheel';
   
   // Pre-select a random category
   const selectedIndex = Math.floor(Math.random() * wheelCategories.length);

@@ -24,7 +24,7 @@ function emitWithTimeout<T extends Record<string, unknown>>(
   return new Promise((resolve) => {
     const socket = getSocket();
     const timer = setTimeout(() => {
-      resolve({ success: false, error: 'Server antwortet nicht (Timeout)' } as T);
+      resolve({ success: false, error: 'Server antwortet nicht (Timeout)' } as unknown as T);
     }, timeoutMs);
 
     socket.emit(event, data, (response: T) => {

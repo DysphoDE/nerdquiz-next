@@ -58,6 +58,14 @@ export const ReconnectPlayerSchema = z.object({
 // GAME SETTINGS
 // ============================================
 
+const CustomRoundConfigSchema = z.object({
+    id: z.string().min(1).max(50),
+    type: z.enum(['question_round', 'hot_button', 'collective_list']),
+    categoryMode: z.enum(['voting', 'wheel', 'losers_pick', 'dice_royale', 'rps_duel', 'random']).optional(),
+    specificQuestionId: z.string().max(100).optional(),
+    specificListName: z.string().max(200).optional(),
+});
+
 export const UpdateSettingsSchema = z.object({
     roomCode: RoomCodeSchema,
     playerId: PlayerIdSchema,
@@ -70,6 +78,8 @@ export const UpdateSettingsSchema = z.object({
         enableEstimation: z.boolean().optional(),
         enableMediaQuestions: z.boolean().optional(),
         hotButtonQuestionsPerRound: z.number().int().min(SETTINGS_VALIDATION.HOT_BUTTON_QUESTIONS_MIN).max(SETTINGS_VALIDATION.HOT_BUTTON_QUESTIONS_MAX).optional(),
+        customMode: z.boolean().optional(),
+        customRounds: z.array(CustomRoundConfigSchema).max(20).optional(),
     }),
 });
 

@@ -30,10 +30,25 @@ import {
   validateSocketEvent,
   CreateRoomSchema,
   JoinRoomSchema,
+  ReconnectPlayerSchema,
+  UpdateSettingsSchema,
+  RerollAvatarSchema,
+  UpdateAvatarSchema,
+  StartGameSchema,
   VoteCategorySchema,
+  LoserPickCategorySchema,
+  DiceRoyaleRollSchema,
+  DiceRoyalePickSchema,
+  RPSChoiceSchema,
+  RPSDuelPickSchema,
   SubmitAnswerSchema,
   SubmitEstimationSchema,
   BonusRoundSubmitSchema,
+  BonusRoundSkipSchema,
+  HotButtonBuzzSchema,
+  HotButtonSubmitSchema,
+  NextSchema,
+  VoteRematchSchema,
   EnableDevModeSchema,
   DevCommandSchema,
 } from '@/lib/validations/socket';
@@ -256,7 +271,13 @@ function handleCreateRoom(socket: Socket) {
 }
 
 function handleJoinRoom(socket: Socket, io: SocketServer) {
-  return (data: { roomCode: string; playerName: string; avatarOptions?: string }, callback: (response: any) => void) => {
+  return (rawData: unknown, callback: (response: any) => void) => {
+    const data = validateSocketEvent(JoinRoomSchema, rawData, 'join_room');
+    if (!data) {
+      callback({ success: false, error: 'Ungültige Eingabe' });
+      return;
+    }
+
     const code = data.roomCode.toUpperCase();
     const room = getRoom(code);
 
@@ -319,7 +340,10 @@ function handleJoinRoom(socket: Socket, io: SocketServer) {
 }
 
 function handleUpdateSettings(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; settings: Partial<GameSettings> }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(UpdateSettingsSchema, rawData, 'update_settings');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room) return;
 
@@ -346,7 +370,10 @@ function handleUpdateSettings(io: SocketServer) {
 }
 
 function handleRerollAvatar(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(RerollAvatarSchema, rawData, 'reroll_avatar');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'lobby') return;
 
@@ -360,7 +387,10 @@ function handleRerollAvatar(io: SocketServer) {
 }
 
 function handleUpdateAvatar(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; avatarOptions: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(UpdateAvatarSchema, rawData, 'update_avatar');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'lobby') return;
 
@@ -376,7 +406,13 @@ function handleUpdateAvatar(io: SocketServer) {
 }
 
 function handleStartGame(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }, callback: (response: any) => void) => {
+  return (rawData: unknown, callback: (response: any) => void) => {
+    const data = validateSocketEvent(StartGameSchema, rawData, 'start_game');
+    if (!data) {
+      callback({ success: false, error: 'Ungültige Eingabe' });
+      return;
+    }
+
     const room = getRoom(data.roomCode);
 
     if (!room) {
@@ -397,7 +433,10 @@ function handleStartGame(io: SocketServer) {
 }
 
 function handleVoteCategory(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; categoryId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(VoteCategorySchema, rawData, 'vote_category');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'category_voting') return;
 
@@ -413,7 +452,10 @@ function handleVoteCategory(io: SocketServer) {
 }
 
 function handleLoserPickCategory(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; categoryId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(LoserPickCategorySchema, rawData, 'loser_pick_category');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'category_losers_pick') return;
     if (data.playerId !== room.state.loserPickPlayerId) return;
@@ -423,7 +465,10 @@ function handleLoserPickCategory(io: SocketServer) {
 }
 
 function handleDiceRoyaleRollEvent(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(DiceRoyaleRollSchema, rawData, 'dice_royale_roll');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'category_dice_royale') return;
 
@@ -432,7 +477,10 @@ function handleDiceRoyaleRollEvent(io: SocketServer) {
 }
 
 function handleDiceRoyalePickEvent(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; categoryId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(DiceRoyalePickSchema, rawData, 'dice_royale_pick');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'category_dice_royale') return;
 
@@ -445,7 +493,10 @@ function handleDiceRoyalePickEvent(io: SocketServer) {
 }
 
 function handleRPSChoiceEvent(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; choice: RPSChoice }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(RPSChoiceSchema, rawData, 'rps_choice');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'category_rps_duel') return;
 
@@ -454,7 +505,10 @@ function handleRPSChoiceEvent(io: SocketServer) {
 }
 
 function handleRPSDuelPickEvent(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; categoryId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(RPSDuelPickSchema, rawData, 'rps_duel_pick');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'category_rps_duel') return;
 
@@ -467,7 +521,10 @@ function handleRPSDuelPickEvent(io: SocketServer) {
 }
 
 function handleSubmitAnswer(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; answerIndex: number }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(SubmitAnswerSchema, rawData, 'submit_answer');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room) return;
 
@@ -476,7 +533,10 @@ function handleSubmitAnswer(io: SocketServer) {
 }
 
 function handleSubmitEstimation(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; value: number }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(SubmitEstimationSchema, rawData, 'submit_estimation');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room) return;
 
@@ -485,7 +545,10 @@ function handleSubmitEstimation(io: SocketServer) {
 }
 
 function handleCollectiveListSubmit(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; answer: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(BonusRoundSubmitSchema, rawData, 'collective_list_submit');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
 
@@ -501,7 +564,10 @@ function handleCollectiveListSubmit(io: SocketServer) {
 }
 
 function handleCollectiveListSkipEvent(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(BonusRoundSkipSchema, rawData, 'collective_list_skip');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
 
@@ -516,7 +582,10 @@ function handleCollectiveListSkipEvent(io: SocketServer) {
 }
 
 function handleHotButtonBuzz(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(HotButtonBuzzSchema, rawData, 'hot_button_buzz');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
 
@@ -528,7 +597,10 @@ function handleHotButtonBuzz(io: SocketServer) {
 }
 
 function handleHotButtonSubmit(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; answer: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(HotButtonSubmitSchema, rawData, 'hot_button_submit');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'bonus_round') return;
 
@@ -540,7 +612,10 @@ function handleHotButtonSubmit(io: SocketServer) {
 }
 
 function handleVoteRematch(socket: Socket, io: SocketServer) {
-  return (data: { roomCode: string; playerId: string; vote: 'yes' | 'no' }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(VoteRematchSchema, rawData, 'vote_rematch');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room || room.state.phase !== 'rematch_voting') return;
 
@@ -549,7 +624,10 @@ function handleVoteRematch(socket: Socket, io: SocketServer) {
 }
 
 function handleNext(io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }) => {
+  return (rawData: unknown) => {
+    const data = validateSocketEvent(NextSchema, rawData, 'next');
+    if (!data) return;
+
     const room = getRoom(data.roomCode);
     if (!room) return;
 
@@ -825,14 +903,15 @@ function handleDevCommand(io: SocketServer) {
           }, room.remainingTime);
         }
 
-        // Resume bonus round timer if active
+        // Resume bonus round timer if active (only Collective List has turn timers)
         if (room.state.bonusRound && room.state.phase === 'bonus_round') {
           const bonusRound = room.state.bonusRound;
-          if (bonusRound.phase === 'playing' && room.remainingTime) {
+          if (bonusRound.type === 'collective_list' && bonusRound.phase === 'playing' && room.remainingTime) {
             // Re-schedule bonus round turn timer
             const { handleBonusRoundTimeout } = require('./gameLogic/bonusRound');
+            const currentPlayerId = bonusRound.activePlayers[bonusRound.currentTurnIndex % bonusRound.activePlayers.length];
             bonusRound.currentTurnTimer = setTimeout(() => {
-              handleBonusRoundTimeout(room, io);
+              handleBonusRoundTimeout(room, io, currentPlayerId);
             }, room.remainingTime);
           }
         }
@@ -851,7 +930,13 @@ function handleDevCommand(io: SocketServer) {
 }
 
 function handleReconnect(socket: Socket, io: SocketServer) {
-  return (data: { roomCode: string; playerId: string }, callback: (response: any) => void) => {
+  return (rawData: unknown, callback: (response: any) => void) => {
+    const data = validateSocketEvent(ReconnectPlayerSchema, rawData, 'reconnect_player');
+    if (!data) {
+      callback({ success: false, error: 'Ungültige Eingabe' });
+      return;
+    }
+
     const room = getRoom(data.roomCode);
     if (!room) {
       callback({ success: false, error: 'Raum nicht gefunden' });

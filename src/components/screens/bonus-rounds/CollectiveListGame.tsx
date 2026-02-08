@@ -670,7 +670,7 @@ export function CollectiveListGame() {
       if (!item.guessedBy) continue; // Not guessed yet
       
       // Exact match against display name
-      if (item.display.toLowerCase() === normalizedInput) {
+      if (item.display && item.display.toLowerCase() === normalizedInput) {
         return item.display;
       }
       
@@ -678,7 +678,7 @@ export function CollectiveListGame() {
       if (item.aliases) {
         for (const alias of item.aliases) {
           if (alias.toLowerCase() === normalizedInput) {
-            return item.display;
+            return item.display ?? null;
           }
         }
       }

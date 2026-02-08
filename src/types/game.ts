@@ -117,7 +117,7 @@ export interface RPSDuelState {
 
 export interface BonusRoundItem {
   id: string;
-  display: string;
+  display?: string; // Hidden for unguessed items (anti-cheat), revealed when guessed or round finished
   group?: string; // Optional grouping (e.g., "West", "East")
   guessedBy?: string; // Player ID who guessed it
   guessedByName?: string;

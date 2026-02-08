@@ -728,6 +728,12 @@ function handleAnswerTimeout(room: GameRoom, io: SocketServer, playerId: string)
     correct: false,
   };
 
+  // Check if rebuzz is possible BEFORE sending the result
+  const connectedPlayers = getConnectedPlayers(room);
+  const playersWhoHaventAttempted = connectedPlayers.filter(p => !hotButton.attemptedPlayerIds.has(p.id));
+  const remainingAttempts = hotButton.maxRebuzzAttempts - hotButton.attemptedPlayerIds.size;
+  const canRebuzz = hotButton.allowRebuzz && remainingAttempts > 0 && playersWhoHaventAttempted.length > 0;
+
   io.to(room.code).emit('hot_button_answer_result', {
     playerId,
     playerName: player?.name,
@@ -735,16 +741,13 @@ function handleAnswerTimeout(room: GameRoom, io: SocketServer, playerId: string)
     correct: false,
     points: 0,
     timeout: true,
-    correctAnswer: currentQuestion.correctAnswer,
+    // Only reveal correct answer when no more rebuzz attempts remain
+    correctAnswer: canRebuzz ? undefined : currentQuestion.correctAnswer,
+    canRebuzz,
+    remainingAttempts,
   });
 
   broadcastRoomUpdate(room, io);
-
-  // Same logic as wrong answer (allow rebuzz if available)
-  const connectedPlayers = getConnectedPlayers(room);
-  const playersWhoHaventAttempted = connectedPlayers.filter(p => !hotButton.attemptedPlayerIds.has(p.id));
-  const remainingAttempts = hotButton.maxRebuzzAttempts - hotButton.attemptedPlayerIds.size;
-  const canRebuzz = hotButton.allowRebuzz && remainingAttempts > 0 && playersWhoHaventAttempted.length > 0;
 
   if (canRebuzz) {
     console.log(`   Rebuzz allowed after timeout`);

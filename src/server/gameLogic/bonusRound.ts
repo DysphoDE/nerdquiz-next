@@ -19,6 +19,10 @@ import {
   handleHotButtonAnswer,
 } from './hotButton';
 
+// Re-export für socketHandlers.ts (Disconnect-Handling)
+export { eliminateCollectiveListPlayer as eliminatePlayer } from './collectiveList';
+export { handleCollectiveListTimeout as handleBonusRoundTimeout } from './collectiveList';
+
 /**
  * Startet eine Bonusrunde basierend auf dem Fragetyp
  */

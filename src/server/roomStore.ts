@@ -268,16 +268,21 @@ export function roomToClient(room: GameRoom): RoomState {
         categoryIcon: br.categoryIcon,
         questionType: br.questionType,
         totalItems: br.items.length,
-        items: br.items.map(item => ({
-          id: item.id,
-          display: item.display,
-          group: item.group,
-          guessedBy: item.guessedBy,
-          guessedByName: item.guessedByName,
-          guessedAt: item.guessedAt,
-          // Only send aliases for already guessed items
-          aliases: item.guessedBy ? item.aliases : undefined,
-        })),
+        items: br.items.map(item => {
+          const isGuessed = !!item.guessedBy;
+          const isFinished = br.phase === 'finished';
+          return {
+            id: item.id,
+            // Only reveal display text for guessed items or when round is finished
+            display: (isGuessed || isFinished) ? item.display : undefined,
+            group: (isGuessed || isFinished) ? item.group : undefined,
+            guessedBy: item.guessedBy,
+            guessedByName: item.guessedByName,
+            guessedAt: item.guessedAt,
+            // Only send aliases for already guessed items
+            aliases: isGuessed ? item.aliases : undefined,
+          };
+        }),
         revealedCount: br.guessedIds.size,
         currentTurn: br.activePlayers.length > 0 && br.phase === 'playing' ? (() => {
           const currentPlayerId = br.activePlayers[br.currentTurnIndex % br.activePlayers.length];
