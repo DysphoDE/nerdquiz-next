@@ -4,7 +4,30 @@ import type { NextRequest } from 'next/server';
 // Pfade die NICHT geschützt werden (Login, Auth-API)
 const PUBLIC_PATHS = ['/admin/login', '/api/admin/auth'];
 
-export function middleware(request: NextRequest) {
+/**
+ * Erzeugt den erwarteten Session-Token aus dem Admin-Passwort.
+ * Muss identisch zur Funktion in auth/route.ts sein.
+ * 
+ * Hinweis: In Edge Middleware ist kein Node.js `crypto` verfügbar,
+ * daher nutzen wir die Web Crypto API (SubtleCrypto).
+ */
+async function createSessionToken(password: string): Promise<string> {
+  const secret = process.env.SESSION_SECRET || password;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(password));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Login-Seite und Auth-API sind öffentlich
@@ -24,6 +47,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Erwarteten Session-Token berechnen
+  const expectedToken = await createSessionToken(adminPassword);
+
   // Prüfe Authorization Header (Basic Auth)
   const authHeader = request.headers.get('authorization');
   
@@ -33,11 +59,14 @@ export function middleware(request: NextRequest) {
     if (type === 'Basic' && credentials) {
       try {
         const decoded = atob(credentials);
-        const [username, password] = decoded.split(':');
+        const [, password] = decoded.split(':');
         
-        // Username ist egal, nur Passwort zählt
-        if (password === adminPassword) {
-          return NextResponse.next();
+        // Passwort prüfen: Token daraus berechnen und vergleichen
+        if (password) {
+          const providedToken = await createSessionToken(password);
+          if (providedToken === expectedToken) {
+            return NextResponse.next();
+          }
         }
       } catch {
         // Invalid base64
@@ -45,10 +74,10 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Prüfe Cookie (für bereits eingeloggte Sessions)
+  // Prüfe Cookie (Session-Token, nicht das Klartext-Passwort)
   const authCookie = request.cookies.get('admin_auth');
   
-  if (authCookie?.value === adminPassword) {
+  if (authCookie?.value === expectedToken) {
     return NextResponse.next();
   }
 

@@ -8,6 +8,32 @@ import { saveSession, clearSession } from '@/lib/session';
 import { getSavedAvatarOptions, optionsToSeed } from '@/components/game/AvatarCustomizer';
 import { useTimeSync } from './useTimeSync';
 
+/** Default-Timeout für Socket-Callbacks in ms */
+const SOCKET_CALLBACK_TIMEOUT = 10000;
+
+/**
+ * Wraps a socket.emit with a timeout.
+ * Falls der Server nicht innerhalb von `timeoutMs` antwortet,
+ * wird der Callback mit einem Fehler-Objekt aufgerufen.
+ */
+function emitWithTimeout<T extends Record<string, unknown>>(
+  event: string,
+  data: Record<string, unknown>,
+  timeoutMs = SOCKET_CALLBACK_TIMEOUT,
+): Promise<T> {
+  return new Promise((resolve) => {
+    const socket = getSocket();
+    const timer = setTimeout(() => {
+      resolve({ success: false, error: 'Server antwortet nicht (Timeout)' } as T);
+    }, timeoutMs);
+
+    socket.emit(event, data, (response: T) => {
+      clearTimeout(timer);
+      resolve(response);
+    });
+  });
+}
+
 export function useSocket() {
   const {
     setConnected,
@@ -164,91 +190,85 @@ export function useSocket() {
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store
 
-  const createRoom = useCallback((playerName: string): Promise<{ success: boolean; roomCode?: string; error?: string }> => {
-    return new Promise((resolve) => {
-      const socket = getSocket();
-      
-      // Get saved avatar options from localStorage
-      const savedOptions = getSavedAvatarOptions();
-      const avatarOptions = savedOptions ? optionsToSeed(savedOptions) : undefined;
-      
-      socket.emit('create_room', { playerName, avatarOptions }, (response: any) => {
-        if (response.success) {
-          setPlayer(response.playerId, response.roomCode);
-          setRoom(response.room);
-          // Save session for reconnect
-          saveSession({
-            playerId: response.playerId,
-            roomCode: response.roomCode,
-            playerName: playerName.trim(),
-          });
-        }
-        resolve(response);
+  const createRoom = useCallback(async (playerName: string): Promise<{ success: boolean; roomCode?: string; error?: string }> => {
+    // Get saved avatar options from localStorage
+    const savedOptions = getSavedAvatarOptions();
+    const avatarOptions = savedOptions ? optionsToSeed(savedOptions) : undefined;
+    
+    const response = await emitWithTimeout<{ success: boolean; roomCode?: string; playerId?: string; room?: RoomState; error?: string }>(
+      'create_room',
+      { playerName, avatarOptions },
+    );
+    
+    if (response.success && response.playerId && response.roomCode) {
+      setPlayer(response.playerId, response.roomCode);
+      setRoom(response.room!);
+      saveSession({
+        playerId: response.playerId,
+        roomCode: response.roomCode,
+        playerName: playerName.trim(),
       });
-    });
+    }
+    return response;
   }, [setPlayer, setRoom]);
 
-  const joinRoom = useCallback((roomCode: string, playerName: string): Promise<{ success: boolean; error?: string }> => {
-    return new Promise((resolve) => {
-      const socket = getSocket();
-      
-      // Get saved avatar options from localStorage
-      const savedOptions = getSavedAvatarOptions();
-      const avatarOptions = savedOptions ? optionsToSeed(savedOptions) : undefined;
-      
-      socket.emit('join_room', { roomCode, playerName, avatarOptions }, (response: any) => {
-        if (response.success) {
-          setPlayer(response.playerId, response.roomCode);
-          setRoom(response.room);
-          // Save session for reconnect
-          saveSession({
-            playerId: response.playerId,
-            roomCode: response.roomCode,
-            playerName: playerName.trim(),
-          });
-        }
-        resolve(response);
+  const joinRoom = useCallback(async (roomCode: string, playerName: string): Promise<{ success: boolean; error?: string }> => {
+    // Get saved avatar options from localStorage
+    const savedOptions = getSavedAvatarOptions();
+    const avatarOptions = savedOptions ? optionsToSeed(savedOptions) : undefined;
+    
+    const response = await emitWithTimeout<{ success: boolean; playerId?: string; roomCode?: string; room?: RoomState; error?: string }>(
+      'join_room',
+      { roomCode, playerName, avatarOptions },
+    );
+    
+    if (response.success && response.playerId && response.roomCode) {
+      setPlayer(response.playerId, response.roomCode);
+      setRoom(response.room!);
+      saveSession({
+        playerId: response.playerId,
+        roomCode: response.roomCode,
+        playerName: playerName.trim(),
       });
-    });
+    }
+    return response;
   }, [setPlayer, setRoom]);
 
-  const reconnectPlayer = useCallback((roomCode: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
-    return new Promise((resolve) => {
-      const socket = getSocket();
-      socket.emit('reconnect_player', { roomCode, playerId }, (response: any) => {
-        if (response.success) {
-          setPlayer(playerId, roomCode);
-          setRoom(response.room);
-          console.log('🔄 Reconnected to room:', roomCode);
-        }
-        resolve(response);
-      });
-    });
+  const reconnectPlayer = useCallback(async (roomCode: string, playerId: string): Promise<{ success: boolean; error?: string }> => {
+    const response = await emitWithTimeout<{ success: boolean; room?: RoomState; error?: string }>(
+      'reconnect_player',
+      { roomCode, playerId },
+    );
+    
+    if (response.success) {
+      setPlayer(playerId, roomCode);
+      setRoom(response.room!);
+      console.log('🔄 Reconnected to room:', roomCode);
+    }
+    return response;
   }, [setPlayer, setRoom]);
 
-  const updateSettings = useCallback((settings: any) => {
+  const updateSettings = useCallback((settings: Record<string, unknown>) => {
     const socket = getSocket();
     const { playerId, roomCode } = useGameStore.getState();
     if (!roomCode || !playerId) return;
     socket.emit('update_settings', { roomCode, playerId, settings });
   }, []);
 
-  const startGame = useCallback((): Promise<{ success: boolean; error?: string }> => {
-    return new Promise((resolve) => {
-      const socket = getSocket();
-      const { playerId, roomCode } = useGameStore.getState();
-      
-      if (!roomCode || !playerId) {
-        resolve({ success: false, error: 'Nicht in einem Raum' });
-        return;
-      }
-      
-      console.log('🚀 Starting game:', { roomCode, playerId });
-      socket.emit('start_game', { roomCode, playerId }, (response: any) => {
-        console.log('🚀 Start game response:', response);
-        resolve(response);
-      });
-    });
+  const startGame = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    const { playerId, roomCode } = useGameStore.getState();
+    
+    if (!roomCode || !playerId) {
+      return { success: false, error: 'Nicht in einem Raum' };
+    }
+    
+    console.log('🚀 Starting game:', { roomCode, playerId });
+    const response = await emitWithTimeout<{ success: boolean; error?: string }>(
+      'start_game',
+      { roomCode, playerId },
+    );
+    console.log('🚀 Start game response:', response);
+    return response;
   }, []);
 
   const voteCategory = useCallback((categoryId: string) => {
