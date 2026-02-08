@@ -260,6 +260,7 @@ export function roomToClient(room: GameRoom): RoomState {
       bonusRoundClient = {
         type: 'collective_list' as const,
         phase: br.phase,
+        skipRulesIntro: br.skipRulesIntro,
         questionId: br.questionId,
         topic: br.topic,
         description: br.description,

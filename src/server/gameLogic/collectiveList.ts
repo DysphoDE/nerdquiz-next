@@ -48,9 +48,17 @@ export function startCollectiveListRound(room: GameRoom, io: SocketServer, confi
   const sortedPlayers = getConnectedPlayers(room).sort((a, b) => a.score - b.score);
   const turnOrder = sortedPlayers.map(p => p.id);
 
+  // Check if rules have already been explained this room
+  if (!room.explainedBonusIntros) {
+    room.explainedBonusIntros = new Set();
+  }
+  const skipRulesIntro = room.explainedBonusIntros.has('collective_list');
+  room.explainedBonusIntros.add('collective_list');
+
   room.state.bonusRound = {
     type: 'collective_list',
     phase: 'intro',
+    skipRulesIntro,
     questionId: config.id,
     topic: config.topic || 'Collective List',
     description: config.description,

@@ -128,6 +128,7 @@ export interface BonusRoundItem {
 export interface CollectiveListBonusRound {
   type: 'collective_list';
   phase: 'intro' | 'playing' | 'finished';
+  skipRulesIntro?: boolean; // true = rules already explained, skip to topic reveal
   questionId?: string; // DB question ID for dev-mode editing
   topic: string;
   description?: string;

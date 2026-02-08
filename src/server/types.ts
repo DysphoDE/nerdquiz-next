@@ -127,6 +127,7 @@ export interface BonusRoundItem {
 export interface ServerCollectiveListState {
   type: 'collective_list';
   phase: 'intro' | 'playing' | 'finished';
+  skipRulesIntro: boolean; // true = rules already explained this room, skip to topic
   questionId?: string; // DB question ID for dev-mode editing
   topic: string;
   description?: string;
@@ -356,6 +357,8 @@ export interface GameRoom {
   // Bonus round intro: server waits for client TTS to finish before starting turns
   introReadyCallback?: () => void;
   introReadyTimeout?: NodeJS.Timeout;
+  // Track which bonus round types have had their rules explained (skip on repeat)
+  explainedBonusIntros?: Set<string>;
 }
 
 // ============================================

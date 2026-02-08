@@ -488,10 +488,11 @@ export function CollectiveListGame() {
   }, [playMusic]);
 
   // === INTRO SUB-PHASES ===
-  // 'rules'  → Show game explanation + play list-intro snippet
+  // 'rules'  → Show game explanation + play list-intro snippet (skipped on repeat)
   // 'topic'  → Reveal question/topic + play TTS reading it
   // 'done'   → TTS finished, waiting for server to start game
-  const [introSubPhase, setIntroSubPhase] = useState<'rules' | 'topic' | 'done'>('rules');
+  const skipRules = bonusRound?.skipRulesIntro ?? false;
+  const [introSubPhase, setIntroSubPhase] = useState<'rules' | 'topic' | 'done'>(skipRules ? 'topic' : 'rules');
   const introSignalSent = useRef(false);
   const introSnippetStarted = useRef(false);
 
