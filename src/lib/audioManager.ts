@@ -80,6 +80,7 @@ class AudioManager {
 
   // Currently playing snippet (to prevent overlapping snippet playback)
   private currentSnippetHowl: Howl | null = null;
+  private currentSnippetSrc: string | null = null;
 
   // Volume state (synced from audioStore via useAudio hook)
   private masterVolume = 0.5;
@@ -464,16 +465,24 @@ class AudioManager {
       // Update volume before playing (in case it changed)
       howl.volume(this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.SNIPPETS);
 
+      // Clear any stale listeners from previous stopped plays
+      // (stop() doesn't trigger 'end', so once() listeners accumulate)
+      howl.off('end');
+      howl.off('playerror');
+
       // Track this as the current snippet
+      this.currentSnippetSrc = src;
       this.currentSnippetHowl = howl;
 
       // Resolve when playback finishes (or on error)
       howl.once('end', () => {
         this.currentSnippetHowl = null;
+        this.currentSnippetSrc = null;
         resolve();
       });
       howl.once('playerror', () => {
         this.currentSnippetHowl = null;
+        this.currentSnippetSrc = null;
         resolve();
       });
 
@@ -483,11 +492,34 @@ class AudioManager {
 
   /**
    * Stoppt den aktuell laufenden Moderator-Snippet-Clip.
+   *
+   * Handles two edge cases:
+   * 1. Loading Howls: stop() doesn't cancel queued play() calls.
+   *    We must unload() to prevent playback after load completes.
+   * 2. Stale listeners: stop() doesn't trigger 'end', so once()
+   *    listeners accumulate. We clear them explicitly.
    */
   private stopCurrentSnippet(): void {
     if (this.currentSnippetHowl) {
-      this.currentSnippetHowl.stop();
+      const howl = this.currentSnippetHowl;
+      const src = this.currentSnippetSrc;
       this.currentSnippetHowl = null;
+      this.currentSnippetSrc = null;
+
+      // Remove event listeners to prevent stale callbacks
+      howl.off('end');
+      howl.off('playerror');
+
+      // If still loading, stop() won't prevent the queued play() from firing
+      // once loading completes. Use unload() and remove from cache.
+      if (howl.state() === 'loading') {
+        howl.unload();
+        if (src) {
+          this.snippetCache.delete(src);
+        }
+      } else {
+        howl.stop();
+      }
     }
   }
 
