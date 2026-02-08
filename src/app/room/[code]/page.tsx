@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSocket } from '@/hooks/useSocket';
@@ -352,30 +352,27 @@ export default function RoomPage() {
   const [joining, setJoining] = useState(false);
   
   // === Game Start Animation & Welcome TTS for ALL players ===
-  // When the phase transitions from 'lobby' to any game phase, we show
-  // the GameStartOverlay as an INTERCEPTING screen. The overlay waits for
-  // BOTH the animation AND the TTS moderator to finish before completing.
-  // On completion, we emit 'game_start_ready' so the server starts its timers.
+  // The lobby → game transition is detected in the Zustand store's setRoom
+  // (outside React's rendering pipeline) to avoid React Compiler optimization issues.
+  // When gameStartPending is true, we show the GameStartOverlay as an
+  // INTERCEPTING screen. The overlay waits for BOTH the animation AND the
+  // TTS moderator to finish. On completion, we emit 'game_start_ready'.
+  const gameStartPending = useGameStore((s) => s.gameStartPending);
+  const clearGameStartPending = useGameStore((s) => s.clearGameStartPending);
   const [showStartAnimation, setShowStartAnimation] = useState(false);
   const ttsPromiseRef = useRef<Promise<void> | undefined>(undefined);
-  const prevPhaseRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const currentPhase = room?.phase ?? null;
-    const prevPhase = prevPhaseRef.current;
-
-    // Detect transition from lobby to any game phase
-    if (prevPhase === 'lobby' && currentPhase && currentPhase !== 'lobby') {
-      // Start TTS and capture the promise so overlay can wait for it
+  // When the store signals a game start, trigger the overlay + audio.
+  // useLayoutEffect ensures this runs BEFORE the browser paints, so the
+  // announcement screen never flashes even for a single frame.
+  useLayoutEffect(() => {
+    if (gameStartPending) {
       ttsPromiseRef.current = playModeratorSnippet('welcome');
-      // Show the start animation screen for ALL players
       setShowStartAnimation(true);
-      // Play a dramatic SFX
       playSfx('fanfare');
+      clearGameStartPending();
     }
-
-    prevPhaseRef.current = currentPhase;
-  }, [room?.phase, playModeratorSnippet, playSfx]);
+  }, [gameStartPending, playModeratorSnippet, playSfx, clearGameStartPending]);
 
   const handleStartAnimationComplete = useCallback(() => {
     setShowStartAnimation(false);
@@ -461,7 +458,9 @@ export default function RoomPage() {
     // Intercept: Show game start animation INSTEAD of the next screen
     // This prevents the next screen from mounting (and wasting its timers)
     // until the animation is complete.
-    if (showStartAnimation) {
+    // gameStartPending catches the instant the store updates (before the effect fires)
+    // showStartAnimation stays true while the overlay plays its animation/TTS
+    if (showStartAnimation || gameStartPending) {
       return <GameStartOverlay key="game-start" onComplete={handleStartAnimationComplete} ttsPromise={ttsPromiseRef.current} />;
     }
     

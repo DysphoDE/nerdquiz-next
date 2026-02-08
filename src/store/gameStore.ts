@@ -55,25 +55,29 @@ interface GameStore {
   isConnected: boolean;
   playerId: string | null;
   roomCode: string | null;
-  
+
   // Room State
   room: RoomState | null;
-  
+
   // UI State
   selectedAnswer: number | null;
   estimationValue: string;
   hasSubmitted: boolean;
-  
+
+  // Game Start Overlay
+  // Detected in setRoom (outside React rendering) to avoid React Compiler issues
+  gameStartPending: boolean;
+
   // Results
   lastResults: AnswerResult[] | null;
   finalRankings: FinalRanking[] | null;
   gameStatistics: GameStatistics | null;
   collectiveListResult: CollectiveListEndResult | null;
-  
+
   // Hot Button specific state
   hotButtonBuzz: HotButtonBuzzEvent | null;
   hotButtonEndResult: HotButtonEndResult | null;
-  
+
   // Actions
   setConnected: (connected: boolean) => void;
   setPlayer: (playerId: string, roomCode: string) => void;
@@ -87,7 +91,8 @@ interface GameStore {
   setCollectiveListResult: (result: CollectiveListEndResult | null) => void;
   setHotButtonBuzz: (buzz: HotButtonBuzzEvent | null) => void;
   setHotButtonEndResult: (result: HotButtonEndResult | null) => void;
-  
+  clearGameStartPending: () => void;
+
   // Utility
   reset: () => void;
   resetQuestion: () => void;
@@ -101,6 +106,7 @@ const initialState = {
   selectedAnswer: null as number | null,
   estimationValue: '',
   hasSubmitted: false,
+  gameStartPending: false,
   lastResults: null as AnswerResult[] | null,
   finalRankings: null as FinalRanking[] | null,
   gameStatistics: null as GameStatistics | null,
@@ -116,7 +122,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   setPlayer: (playerId, roomCode) => set({ playerId, roomCode }),
   
-  setRoom: (room) => set({ room }),
+  setRoom: (room) => {
+    const prevPhase = get().room?.phase ?? null;
+    const newPhase = room?.phase ?? null;
+    // Detect lobby → game transition (outside React rendering pipeline)
+    const isGameStart = prevPhase === 'lobby' && newPhase !== null && newPhase !== 'lobby';
+    set({ room, ...(isGameStart ? { gameStartPending: true } : {}) });
+  },
   
   setSelectedAnswer: (index) => set({ selectedAnswer: index }),
   
@@ -135,7 +147,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setHotButtonBuzz: (buzz) => set({ hotButtonBuzz: buzz }),
   
   setHotButtonEndResult: (result) => set({ hotButtonEndResult: result }),
-  
+
+  clearGameStartPending: () => set({ gameStartPending: false }),
+
   reset: () => set(initialState),
   
   resetQuestion: () => set({ 
