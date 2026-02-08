@@ -25,7 +25,7 @@ export type TtsProvider = typeof TTS_PROVIDERS[keyof typeof TTS_PROVIDERS];
  * 
  * Hier umschalten welcher Provider für die Sprachsynthese genutzt wird:
  * - 'openai'     → OpenAI TTS (gpt-4o-mini-tts, tts-1, tts-1-hd)
- * - 'elevenlabs' → ElevenLabs TTS (eleven_multilingual_v2 etc.)
+ * - 'elevenlabs' → ElevenLabs TTS (eleven_v3, eleven_multilingual_v2 etc.)
  */
 export const TTS_PROVIDER: TtsProvider = TTS_PROVIDERS.ELEVENLABS;
 
@@ -92,10 +92,12 @@ export type TtsModel = typeof TTS_MODELS[keyof typeof TTS_MODELS];
 /**
  * ElevenLabs TTS Modelle
  * 
- * - eleven_multilingual_v2: Bestes multilinguales Modell, unterstützt Deutsch
+ * - eleven_v3: Neustes & bestes Modell, emotionsreich, 70+ Sprachen, 5.000 Zeichen Limit
+ * - eleven_multilingual_v2: Stabiles multilinguales Modell, 29 Sprachen, 10.000 Zeichen Limit
  * - eleven_turbo_v2_5: Schneller, niedrigere Latenz
  */
 export const ELEVENLABS_MODELS = {
+  V3: 'eleven_v3',
   MULTILINGUAL_V2: 'eleven_multilingual_v2',
   TURBO_V2_5: 'eleven_turbo_v2_5',
 } as const;
@@ -112,8 +114,8 @@ export const ELEVENLABS_CONFIG = {
   /** Voice ID für die Quizmaster-Stimme */
   VOICE_ID: 'DQ4rTqXxHr077oQgsA9D',
 
-  /** Standard-Modell */
-  DEFAULT_MODEL: ELEVENLABS_MODELS.MULTILINGUAL_V2 as ElevenLabsModel,
+  /** Standard-Modell (v3 = neuestes, emotionsreichstes Modell) */
+  DEFAULT_MODEL: ELEVENLABS_MODELS.V3 as ElevenLabsModel,
 
   /** Ausgabeformat (mp3_44100_128 = gute Qualität) */
   OUTPUT_FORMAT: 'mp3_44100_128' as const,
@@ -151,7 +153,7 @@ export const TTS_CONFIG = {
   DEFAULT_VOICE: TTS_VOICES.CEDAR,
   
   /** Sprechgeschwindigkeit (0.25 - 4.0, 1.0 = normal) */
-  DEFAULT_SPEED: 1.1,
+  DEFAULT_SPEED: 1.0,
   
   /** Ausgabeformat */
   OUTPUT_FORMAT: 'mp3' as const,
@@ -225,6 +227,11 @@ Kurz, knackig und mitreißend auf Deutsch.`,
   HOT_BUTTON: `Du bist ein schneller, energiegeladener Quizmaster.
 Lies die Frage zügig aber klar vor - die Spieler müssen schnell buzzen!
 Erzeuge Zeitdruck und Spannung in deiner Stimme.`,
+
+  /** Für Scoreboard-Zwischenstand-Ansagen */
+  SCOREBOARD: `Du bist ein unterhaltsamer Showmaster, der den Zwischenstand verkündet.
+Sprich mit Energie und Humor. Necke die Schlusslichter freundlich und feiere die Führenden.
+Mach es kurz, knackig und mitreißend auf Deutsch.`,
 } as const;
 
 export type TtsInstructionKey = keyof typeof TTS_INSTRUCTIONS;

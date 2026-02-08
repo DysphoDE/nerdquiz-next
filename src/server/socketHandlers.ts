@@ -180,6 +180,22 @@ export function setupSocketHandlers(io: SocketServer): void {
       callback();
     });
 
+    // === SCOREBOARD TTS DONE (client TTS finished) ===
+    socket.on('scoreboard_tts_done', (data: { roomCode: string }) => {
+      if (!data?.roomCode) return;
+      const room = getRoom(data.roomCode);
+      if (!room?.scoreboardReadyCallback) return;
+
+      console.log(`📊 Scoreboard TTS done received for room ${room.code}`);
+      if (room.scoreboardReadyTimeout) {
+        clearTimeout(room.scoreboardReadyTimeout);
+        room.scoreboardReadyTimeout = undefined;
+      }
+      const callback = room.scoreboardReadyCallback;
+      room.scoreboardReadyCallback = undefined;
+      callback();
+    });
+
     // === COLLECTIVE LIST INTRO DONE (client TTS finished) ===
     socket.on('collective_list_intro_done', (data: { roomCode: string }) => {
       if (!data?.roomCode) return;
@@ -637,6 +653,12 @@ function handleNext(io: SocketServer) {
     if (room.state.phase === 'revealing' || room.state.phase === 'estimation_reveal') {
       proceedAfterReveal(room, io);
     } else if (room.state.phase === 'scoreboard') {
+      // Clean up scoreboard TTS callback/timeout before manual advance
+      if (room.scoreboardReadyTimeout) {
+        clearTimeout(room.scoreboardReadyTimeout);
+        room.scoreboardReadyTimeout = undefined;
+      }
+      room.scoreboardReadyCallback = undefined;
       startCategorySelection(room, io);
     }
   };

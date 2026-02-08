@@ -27,6 +27,7 @@ import {
   UI_TIMING,
   GAME_TIMERS,
 } from '@/config/constants';
+import { generateScoreboardAnnouncement } from './scoreboardAnnouncement';
 import {
   selectCategoryMode,
   getRandomCategoriesForVoting,
@@ -444,16 +445,53 @@ export async function startCategorySelection(room: GameRoom, io: SocketServer): 
 // SCOREBOARD
 // ============================================
 
+/** Fallback-Timeout für Scoreboard-TTS (30 Sekunden) */
+const SCOREBOARD_TTS_FALLBACK = 30000;
+
 /**
- * Zeigt das Scoreboard nach einer Runde
+ * Zeigt das Scoreboard nach einer Runde.
+ * Bei mehreren Spielern wird eine TTS-Ansage generiert und
+ * nach Abspielen automatisch zur nächsten Runde gewechselt.
  */
 export function showScoreboard(room: GameRoom, io: SocketServer): void {
   room.state.phase = 'scoreboard';
   room.state.currentQuestion = null;
   room.state.timerEnd = null;
 
+  // Generate scoreboard announcement for multi-player games
+  const sortedPlayers = Array.from(room.players.values())
+    .filter(p => p.isConnected)
+    .sort((a, b) => b.score - a.score)
+    .map(p => ({ name: p.name, score: p.score }));
+
+  const ttsText = generateScoreboardAnnouncement(sortedPlayers);
+
   emitPhaseChange(room, io, 'scoreboard');
   broadcastRoomUpdate(room, io);
+
+  if (ttsText) {
+    // Send TTS text to clients
+    io.to(room.code).emit('scoreboard_announcement', { ttsText });
+
+    // Set up callback + fallback for auto-advance after TTS
+    const roomCode = room.code;
+    room.scoreboardReadyCallback = () => {
+      const currentRoom = getRoom(roomCode);
+      if (currentRoom && currentRoom.state.phase === 'scoreboard') {
+        startCategorySelection(currentRoom, io);
+      }
+    };
+    room.scoreboardReadyTimeout = setTimeout(() => {
+      if (room.scoreboardReadyCallback) {
+        console.log(`⏰ Scoreboard TTS timeout reached for room ${room.code}, proceeding anyway`);
+        const callback = room.scoreboardReadyCallback;
+        room.scoreboardReadyCallback = undefined;
+        room.scoreboardReadyTimeout = undefined;
+        callback();
+      }
+    }, SCOREBOARD_TTS_FALLBACK);
+  }
+  // Solo player: no TTS, no auto-advance — host advances manually
 }
 
 // ============================================

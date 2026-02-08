@@ -16,7 +16,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useGameStore, useIsHost, usePlayers } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useCallback } from 'react';
 import { getAvatarUrlFromSeed } from '@/components/game/AvatarCustomizer';
 import { useAudio } from '@/hooks/useAudio';
 
@@ -61,16 +61,36 @@ interface PlayerWithRankChange {
 }
 
 export function ScoreboardScreen() {
-  const { next } = useSocket();
+  const { next, emitScoreboardTtsDone } = useSocket();
   const { room } = useGameStore();
+  const scoreboardTtsText = useGameStore((s) => s.scoreboardTtsText);
+  const setScoreboardTtsText = useGameStore((s) => s.setScoreboardTtsText);
   const isHost = useIsHost();
   const unsortedPlayers = usePlayers();
-  const { playMusic } = useAudio();
+  const { playMusic, playTTS, stopTTS } = useAudio();
 
   // Play scoreboard music when entering
   useEffect(() => {
     playMusic('scoreboard');
   }, [playMusic]);
+
+  // Play TTS announcement when text is set
+  useEffect(() => {
+    if (!scoreboardTtsText) return;
+    const text = scoreboardTtsText;
+
+    playTTS(text, { instructionKey: 'SCOREBOARD' }).then(() => {
+      emitScoreboardTtsDone();
+      setScoreboardTtsText(null);
+    });
+  }, [scoreboardTtsText, playTTS, emitScoreboardTtsDone, setScoreboardTtsText]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setScoreboardTtsText(null);
+    };
+  }, [setScoreboardTtsText]);
   
   // Track previous scores & ranks to calculate real rank changes
   const previousSnapshotRef = useRef<Map<string, { score: number; rank: number }> | null>(null);
@@ -111,10 +131,12 @@ export function ScoreboardScreen() {
     return result;
   }, [unsortedPlayers]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (!room || !isHost) return;
+    stopTTS();
+    setScoreboardTtsText(null);
     next();
-  };
+  }, [room, isHost, stopTTS, setScoreboardTtsText, next]);
 
   const isFinalRound = room && room.currentRound >= room.settings.maxRounds;
   const leader = players[0];
@@ -364,7 +386,7 @@ export function ScoreboardScreen() {
                 className="w-2 h-2 rounded-full bg-primary/50"
               />
               <span className="text-sm sm:text-base">
-                {isFinalRound ? 'Gleich kommt das Endergebnis...' : 'Warte auf Host...'}
+                {isFinalRound ? 'Gleich kommt das Endergebnis...' : 'Weiter geht\'s gleich...'}
               </span>
             </div>
           )}

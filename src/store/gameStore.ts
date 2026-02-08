@@ -78,6 +78,9 @@ interface GameStore {
   hotButtonBuzz: HotButtonBuzzEvent | null;
   hotButtonEndResult: HotButtonEndResult | null;
 
+  // Scoreboard TTS
+  scoreboardTtsText: string | null;
+
   // Actions
   setConnected: (connected: boolean) => void;
   setPlayer: (playerId: string, roomCode: string) => void;
@@ -91,6 +94,7 @@ interface GameStore {
   setCollectiveListResult: (result: CollectiveListEndResult | null) => void;
   setHotButtonBuzz: (buzz: HotButtonBuzzEvent | null) => void;
   setHotButtonEndResult: (result: HotButtonEndResult | null) => void;
+  setScoreboardTtsText: (text: string | null) => void;
   clearGameStartPending: () => void;
 
   // Utility
@@ -113,6 +117,7 @@ const initialState = {
   collectiveListResult: null as CollectiveListEndResult | null,
   hotButtonBuzz: null as HotButtonBuzzEvent | null,
   hotButtonEndResult: null as HotButtonEndResult | null,
+  scoreboardTtsText: null as string | null,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -147,6 +152,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setHotButtonBuzz: (buzz) => set({ hotButtonBuzz: buzz }),
   
   setHotButtonEndResult: (result) => set({ hotButtonEndResult: result }),
+
+  setScoreboardTtsText: (text) => set({ scoreboardTtsText: text }),
 
   clearGameStartPending: () => set({ gameStartPending: false }),
 

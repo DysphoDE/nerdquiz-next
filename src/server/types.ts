@@ -357,6 +357,9 @@ export interface GameRoom {
   // Bonus round intro: server waits for client TTS to finish before starting turns
   introReadyCallback?: () => void;
   introReadyTimeout?: NodeJS.Timeout;
+  // Scoreboard TTS: server waits for client TTS to finish before auto-advancing
+  scoreboardReadyCallback?: () => void;
+  scoreboardReadyTimeout?: NodeJS.Timeout;
   // Track which bonus round types have had their rules explained (skip on repeat)
   explainedBonusIntros?: Set<string>;
 }

@@ -45,6 +45,7 @@ export function useSocket() {
     setCollectiveListResult,
     setHotButtonBuzz,
     setHotButtonEndResult,
+    setScoreboardTtsText,
     resetQuestion,
     reset,
   } = useGameStore();
@@ -135,6 +136,11 @@ export function useSocket() {
       // Redirect will happen via the component that detects null room
     };
 
+    const handleScoreboardAnnouncement = (data: { ttsText: string }) => {
+      console.log('📊 Scoreboard announcement received');
+      setScoreboardTtsText(data.ttsText);
+    };
+
     const handleRematchResult = (data: { rematch: boolean; newHostId?: string; newHostName?: string }) => {
       console.log('🔄 Rematch result:', data);
       if (data.rematch) {
@@ -158,6 +164,7 @@ export function useSocket() {
     socket.on('hot_button_buzz', handleHotButtonBuzz);
     socket.on('hot_button_end', handleHotButtonEnd);
     socket.on('kicked_from_room', handleKickedFromRoom);
+    socket.on('scoreboard_announcement', handleScoreboardAnnouncement);
     socket.on('rematch_result', handleRematchResult);
 
     // Connect if not already connected
@@ -183,9 +190,10 @@ export function useSocket() {
       socket.off('hot_button_buzz', handleHotButtonBuzz);
       socket.off('hot_button_end', handleHotButtonEnd);
       socket.off('kicked_from_room', handleKickedFromRoom);
+      socket.off('scoreboard_announcement', handleScoreboardAnnouncement);
       socket.off('rematch_result', handleRematchResult);
     };
-  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setCollectiveListResult, setHotButtonBuzz, setHotButtonEndResult, resetQuestion, reset]);
+  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setCollectiveListResult, setHotButtonBuzz, setHotButtonEndResult, setScoreboardTtsText, resetQuestion, reset]);
 
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store
@@ -380,6 +388,14 @@ export function useSocket() {
     socket.emit('collective_list_intro_done', { roomCode });
   }, []);
 
+  const emitScoreboardTtsDone = useCallback(() => {
+    const socket = getSocket();
+    const { roomCode } = useGameStore.getState();
+    if (!roomCode) return;
+    console.log('📊 Emitting scoreboard_tts_done');
+    socket.emit('scoreboard_tts_done', { roomCode });
+  }, []);
+
   return {
     createRoom,
     joinRoom,
@@ -401,5 +417,6 @@ export function useSocket() {
     voteRematch,
     emitGameStartReady,
     emitCollectiveListIntroDone,
+    emitScoreboardTtsDone,
   };
 }
