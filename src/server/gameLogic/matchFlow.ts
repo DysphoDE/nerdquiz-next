@@ -147,14 +147,26 @@ async function startBonusRoundByType(
   room: GameRoom,
   io: SocketServer,
   bonusType: 'hot_button' | 'collective_list',
-  isGameStart = false
+  isGameStart = false,
+  specificQuestionId?: string
 ): Promise<boolean> {
   const excludeIds = Array.from(room.state.usedBonusQuestionIds);
   const hotButtonCount = room.settings.hotButtonQuestionsPerRound || 5;
-  
-  // Load appropriate bonus round question from DB
-  const loader = BONUS_QUESTION_LOADERS[bonusType];
-  const bonusQuestion = loader ? await loader(excludeIds, hotButtonCount) : null;
+
+  // Try loading a specific question first (custom game mode)
+  let bonusQuestion: any = null;
+  if (specificQuestionId && bonusType === 'collective_list') {
+    bonusQuestion = await questionLoader.getSpecificBonusRoundQuestion(specificQuestionId);
+    if (!bonusQuestion) {
+      console.log(`⚠️ Specific question ${specificQuestionId} not found, falling back to random`);
+    }
+  }
+
+  // Load random question if no specific one was requested or found
+  if (!bonusQuestion) {
+    const loader = BONUS_QUESTION_LOADERS[bonusType];
+    bonusQuestion = loader ? await loader(excludeIds, hotButtonCount) : null;
+  }
   
   if (!bonusQuestion) {
     console.log(`⚠️ No ${bonusType} questions available`);
@@ -239,7 +251,7 @@ async function startCustomRound(
     }
 
     case 'collective_list': {
-      const success = await startBonusRoundByType(room, io, 'collective_list', isGameStart);
+      const success = await startBonusRoundByType(room, io, 'collective_list', isGameStart, roundConfig.specificQuestionId);
       if (!success) {
         console.log(`⚠️ Collective List not available, falling back to question round`);
         await startQuestionRound(room, io, 'random', isGameStart);

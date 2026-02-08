@@ -12,6 +12,7 @@ import {
   GripVertical,
   ChevronRight,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -43,6 +44,14 @@ import type { CategorySelectionMode } from '@/config/gameModes.shared';
 // ============================================
 // TYPES
 // ============================================
+
+interface CollectiveListInfo {
+  id: string;
+  topic: string;
+  itemCount: number;
+  category?: string;
+  categoryIcon?: string;
+}
 
 interface CustomGameConfiguratorProps {
   open: boolean;
@@ -103,6 +112,9 @@ function RoundNode({
   onRemove,
   onTypeChange,
   onCategoryModeChange,
+  onListSelectionChange,
+  collectiveLists,
+  listsLoading,
   dragControls,
 }: {
   round: CustomRoundConfig;
@@ -113,6 +125,9 @@ function RoundNode({
   onRemove: () => void;
   onTypeChange: (type: RoundType) => void;
   onCategoryModeChange: (mode: CategorySelectionMode | 'random') => void;
+  onListSelectionChange: (questionId: string | undefined, listName: string | undefined) => void;
+  collectiveLists: CollectiveListInfo[];
+  listsLoading: boolean;
   dragControls: ReturnType<typeof useDragControls>;
 }) {
   const roundType = ROUND_TYPE_DATA_MAP.get(round.type);
@@ -134,6 +149,11 @@ function RoundNode({
   // Get category mode label if not random
   const categoryModeLabel = round.type === 'question_round' && round.categoryMode && round.categoryMode !== 'random'
     ? getCategoryModeName(round.categoryMode)
+    : null;
+
+  // Get specific list label
+  const listLabel = round.type === 'collective_list' && round.specificListName
+    ? round.specificListName
     : null;
 
   return (
@@ -180,6 +200,12 @@ function RoundNode({
             {categoryModeLabel && (
               <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
                 {categoryModeLabel}
+              </span>
+            )}
+            {/* Show specific list name */}
+            {listLabel && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium truncate max-w-[120px]">
+                {listLabel}
               </span>
             )}
           </div>
@@ -275,6 +301,58 @@ function RoundNode({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Expanded Options for Collective List Rounds */}
+      <AnimatePresence>
+        {isSelected && round.type === 'collective_list' && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2 pl-7">
+              <p className="text-xs text-muted-foreground mb-2">Liste:</p>
+              {listsLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Listen werden geladen...</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={() => onListSelectionChange(undefined, undefined)}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+                      !round.specificQuestionId
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/50 hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    🎲 Zufall
+                  </button>
+                  {collectiveLists.map((list) => (
+                    <button
+                      key={list.id}
+                      onClick={() => onListSelectionChange(list.id, list.topic)}
+                      title={`${list.topic} (${list.itemCount} Begriffe)${list.category ? ` — ${list.category}` : ''}`}
+                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-all truncate max-w-[200px] ${
+                        round.specificQuestionId === list.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted/50 hover:bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {list.categoryIcon ? `${list.categoryIcon} ` : ''}{list.topic}
+                    </button>
+                  ))}
+                  {collectiveLists.length === 0 && (
+                    <span className="text-xs text-muted-foreground py-1">Keine Listen verfügbar</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -292,6 +370,9 @@ function DraggableRoundItem({
   onRemove,
   onTypeChange,
   onCategoryModeChange,
+  onListSelectionChange,
+  collectiveLists,
+  listsLoading,
   showAddButton,
   onAddAt,
 }: {
@@ -303,14 +384,17 @@ function DraggableRoundItem({
   onRemove: () => void;
   onTypeChange: (type: RoundType) => void;
   onCategoryModeChange: (mode: CategorySelectionMode | 'random') => void;
+  onListSelectionChange: (questionId: string | undefined, listName: string | undefined) => void;
+  collectiveLists: CollectiveListInfo[];
+  listsLoading: boolean;
   showAddButton: boolean;
   onAddAt: (type: RoundType) => void;
 }) {
   const dragControls = useDragControls();
 
   return (
-    <Reorder.Item 
-      key={round.id} 
+    <Reorder.Item
+      key={round.id}
       value={round}
       dragListener={false}
       dragControls={dragControls}
@@ -324,6 +408,9 @@ function DraggableRoundItem({
         onRemove={onRemove}
         onTypeChange={onTypeChange}
         onCategoryModeChange={onCategoryModeChange}
+        onListSelectionChange={onListSelectionChange}
+        collectiveLists={collectiveLists}
+        listsLoading={listsLoading}
         dragControls={dragControls}
       />
       {/* Add between nodes */}
@@ -515,6 +602,22 @@ function ConfiguratorContent({
   onQuestionsPerRoundChange: (value: number) => void;
 }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [collectiveLists, setCollectiveLists] = useState<CollectiveListInfo[]>([]);
+  const [listsLoading, setListsLoading] = useState(false);
+  const listsLoadedRef = useRef(false);
+
+  // Lazy-load collective lists when a collective_list round exists
+  const hasCollectiveListRound = rounds.some(r => r.type === 'collective_list');
+  useEffect(() => {
+    if (!hasCollectiveListRound || listsLoadedRef.current) return;
+    listsLoadedRef.current = true;
+    setListsLoading(true);
+    fetch('/api/collective-lists')
+      .then(res => res.json())
+      .then((data: CollectiveListInfo[]) => setCollectiveLists(data))
+      .catch(() => setCollectiveLists([]))
+      .finally(() => setListsLoading(false));
+  }, [hasCollectiveListRound]);
 
   // Update a single round
   const handleUpdateRound = useCallback((index: number, updated: CustomRoundConfig) => {
@@ -527,13 +630,17 @@ function ConfiguratorContent({
   const handleTypeChange = useCallback((index: number, newType: RoundType) => {
     const current = rounds[index];
     if (newType === 'question_round') {
+      const { specificQuestionId, specificListName, ...rest } = current;
       handleUpdateRound(index, {
-        ...current,
+        ...rest,
         type: newType,
         categoryMode: current.categoryMode || 'random',
       });
-    } else {
+    } else if (newType === 'collective_list') {
       const { categoryMode, questionsPerRound, ...rest } = current;
+      handleUpdateRound(index, { ...rest, type: newType });
+    } else {
+      const { categoryMode, questionsPerRound, specificQuestionId, specificListName, ...rest } = current;
       handleUpdateRound(index, { ...rest, type: newType });
     }
   }, [rounds, handleUpdateRound]);
@@ -542,6 +649,17 @@ function ConfiguratorContent({
   const handleCategoryModeChange = useCallback((index: number, mode: CategorySelectionMode | 'random') => {
     const current = rounds[index];
     handleUpdateRound(index, { ...current, categoryMode: mode });
+  }, [rounds, handleUpdateRound]);
+
+  // Change list selection for collective_list rounds
+  const handleListSelectionChange = useCallback((index: number, questionId: string | undefined, listName: string | undefined) => {
+    const current = rounds[index];
+    if (questionId) {
+      handleUpdateRound(index, { ...current, specificQuestionId: questionId, specificListName: listName });
+    } else {
+      const { specificQuestionId, specificListName, ...rest } = current;
+      handleUpdateRound(index, rest);
+    }
   }, [rounds, handleUpdateRound]);
 
   // Remove a round
@@ -661,6 +779,9 @@ function ConfiguratorContent({
                   onRemove={() => handleRemove(index)}
                   onTypeChange={(type) => handleTypeChange(index, type)}
                   onCategoryModeChange={(mode) => handleCategoryModeChange(index, mode)}
+                  onListSelectionChange={(qId, name) => handleListSelectionChange(index, qId, name)}
+                  collectiveLists={collectiveLists}
+                  listsLoading={listsLoading}
                   showAddButton={index < rounds.length - 1 && rounds.length < 20}
                   onAddAt={(type) => handleAddAt(index + 1, type)}
                 />

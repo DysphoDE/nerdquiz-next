@@ -85,7 +85,7 @@ export interface CustomRoundConfig {
   id: string;
   /** Typ der Runde */
   type: RoundType;
-  /** 
+  /**
    * Für Fragerunden: Wie wird die Kategorie ausgewählt?
    * 'random' = zufällige Auswahl wie im Standard-Modus
    */
@@ -94,6 +94,15 @@ export interface CustomRoundConfig {
    * Für Fragerunden: Anzahl der Fragen (optional, nutzt sonst Settings-Default)
    */
   questionsPerRound?: number;
+  /**
+   * Für Listen-Runden: Spezifische Fragen-ID aus der DB (optional)
+   * Wenn gesetzt, wird diese Liste statt einer zufälligen verwendet.
+   */
+  specificQuestionId?: string;
+  /**
+   * Für Listen-Runden: Display-Name der gewählten Liste (nur für UI)
+   */
+  specificListName?: string;
 }
 
 // ============================================
@@ -131,10 +140,12 @@ export function createHotButtonRound(): CustomRoundConfig {
 /**
  * Erstellt eine Collective List Runde
  */
-export function createCollectiveListRound(): CustomRoundConfig {
+export function createCollectiveListRound(specificQuestionId?: string, specificListName?: string): CustomRoundConfig {
   return {
     id: generateRoundId(),
     type: 'collective_list',
+    ...(specificQuestionId && { specificQuestionId }),
+    ...(specificListName && { specificListName }),
   };
 }
 

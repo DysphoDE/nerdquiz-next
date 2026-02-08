@@ -662,6 +662,72 @@ export async function getRandomBonusRoundQuestion(excludeIds: string[] = []): Pr
 }
 
 /**
+ * Get a specific COLLECTIVE_LIST question by ID
+ * Used in custom game mode when a specific list is selected.
+ * Falls back to null if the question doesn't exist or is inactive.
+ */
+export async function getSpecificBonusRoundQuestion(questionId: string): Promise<BonusRoundQuestion | null> {
+  if (!prisma) {
+    console.warn('⚠️ Database not available for specific bonus round question');
+    return null;
+  }
+
+  try {
+    const question = await prisma.question.findFirst({
+      where: {
+        id: questionId,
+        type: 'COLLECTIVE_LIST',
+        isActive: true,
+      },
+    });
+
+    if (!question) {
+      console.warn(`⚠️ Specific COLLECTIVE_LIST question not found: ${questionId}`);
+      return null;
+    }
+
+    const content = question.content as any;
+
+    if (!content || !content.items || !Array.isArray(content.items)) {
+      console.warn('⚠️ Invalid COLLECTIVE_LIST content structure');
+      return null;
+    }
+
+    // Load category info if available
+    let categoryName: string | undefined;
+    let categoryIcon: string | undefined;
+    if (question.categoryId) {
+      const categoryData = await getCategoryData(question.categoryId);
+      if (categoryData) {
+        categoryName = categoryData.name;
+        categoryIcon = categoryData.icon;
+      }
+    }
+
+    return {
+      id: question.id,
+      topic: content.topic || question.text,
+      description: content.description,
+      category: categoryName,
+      categoryIcon: categoryIcon,
+      questionType: 'Liste',
+      items: content.items.map((item: any, idx: number) => ({
+        id: item.id || `item-${idx}`,
+        display: item.display,
+        aliases: item.aliases || [item.display],
+        group: item.group,
+      })),
+      timePerTurn: content.timePerTurn || (COLLECTIVE_LIST_TIMING.TURN_DURATION / 1000),
+      pointsPerCorrect: content.pointsPerCorrect || COLLECTIVE_LIST_SCORING.POINTS_PER_CORRECT,
+      fuzzyThreshold: content.fuzzyThreshold || MATCHING.FUZZY_THRESHOLD,
+    };
+  } catch (error) {
+    console.error('Error loading specific bonus round question:', error);
+    return null;
+  }
+}
+
+/**
  * Get random HOT_BUTTON questions from the database (5 questions for a round)
  * 
  * NOTE: Bonus rounds are NOT restricted by category question counts.
