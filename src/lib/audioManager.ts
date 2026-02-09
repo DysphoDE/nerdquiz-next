@@ -384,18 +384,21 @@ class AudioManager {
         src: [url],
         format: ['mp3'],
         volume: this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.API_TTS,
-        html5: true,
+        // NOTE: html5 bewusst NICHT gesetzt (nutzt Web Audio API).
+        // html5:true erzeugt <audio>-Elemente, und unload()+neues Element
+        // verursacht MEDIA_ERR_SRC_NOT_SUPPORTED (error 4) in manchen Browsern.
+        // Web Audio API ist robuster für kurze, same-origin TTS-Dateien.
         onend: () => {
           this.currentTTS = null;
           resolve();
         },
         onloaderror: (_id, error) => {
-          console.warn('[AudioManager] TTS URL load error:', error);
+          console.warn('[AudioManager] TTS URL load error:', error, 'url:', url);
           this.currentTTS = null;
           resolve(); // Resolve anyway — TTS is nice-to-have
         },
         onplayerror: (_id, error) => {
-          console.warn('[AudioManager] TTS URL play error:', error);
+          console.warn('[AudioManager] TTS URL play error:', error, 'url:', url);
           this.currentTTS = null;
           resolve();
         },
