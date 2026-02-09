@@ -5,7 +5,8 @@
       "Bash(npx next build)",
       "Bash(npm run build:*)",
       "Bash(xargs cat:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

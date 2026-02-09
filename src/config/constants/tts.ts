@@ -271,8 +271,8 @@ export const TTS_CACHE = {
   /** Verzeichnis relativ zum Projekt-Root (für serverseitiges Lesen/Schreiben) */
   DIR: 'public/audio/tts-cache',
   
-  /** URL-Prefix für den Client (zum direkten Abrufen gecachter Dateien) */
-  PUBLIC_URL_PREFIX: '/audio/tts-cache',
+  /** URL-Prefix für den Client (API-Route statt statischem File-Serving) */
+  PUBLIC_URL_PREFIX: '/api/tts-audio',
 } as const;
 
 // ============================================

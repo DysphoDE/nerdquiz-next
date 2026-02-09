@@ -42,7 +42,7 @@ function getCachedUrl(cacheId: string): string | null {
     const cachePath = getCachePath(cacheId);
     if (existsSync(cachePath)) {
       console.log(`[TTS Service] Cache HIT: ${cacheId}`);
-      return `${TTS_CACHE.PUBLIC_URL_PREFIX}/${cacheId.replace(/[^a-zA-Z0-9_-]/g, '')}.mp3`;
+      return `${TTS_CACHE.PUBLIC_URL_PREFIX}/${cacheId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
     }
   } catch {
     // Ignore
@@ -65,7 +65,7 @@ function cacheAudio(cacheId: string, audio: ArrayBuffer): string {
   writeFileSync(cachePath, Buffer.from(audio));
   console.log(`[TTS Service] Cached: ${cacheId} (${audio.byteLength} bytes)`);
 
-  return `${TTS_CACHE.PUBLIC_URL_PREFIX}/${safeId}.mp3`;
+  return `${TTS_CACHE.PUBLIC_URL_PREFIX}/${safeId}`;
 }
 
 // ============================================
