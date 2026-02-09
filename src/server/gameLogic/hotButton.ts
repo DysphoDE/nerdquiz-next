@@ -19,6 +19,7 @@ import {
   emitPhaseChange,
   broadcastRoomUpdate,
 } from '../roomStore';
+import { generateAndCache } from '../ttsService';
 import { botManager } from '../botManager';
 import { checkAnswer as fuzzyCheckAnswer } from '@/lib/fuzzyMatch';
 import {
@@ -140,7 +141,7 @@ function clearAllTimers(hotButton: ServerHotButtonState): void {
 /**
  * Startet die nächste Frage
  */
-function startNextQuestion(room: GameRoom, io: SocketServer): void {
+async function startNextQuestion(room: GameRoom, io: SocketServer): Promise<void> {
   const hotButton = room.state.bonusRound;
   if (!hotButton || hotButton.type !== 'hot_button') return;
 
@@ -166,6 +167,10 @@ function startNextQuestion(room: GameRoom, io: SocketServer): void {
 
   console.log(`❓ Hot Button Question ${hotButton.currentQuestionIndex + 1}/${hotButton.questions.length}`);
   console.log(`   "${currentQuestion.text}"`);
+
+  // Pre-generate TTS for this question (1 API call for all clients)
+  const ttsUrl = await generateAndCache(currentQuestion.text, currentQuestion.id);
+  room.state.ttsUrl = ttsUrl;
 
   broadcastRoomUpdate(room, io);
   startQuestionReveal(room, io, currentQuestion);

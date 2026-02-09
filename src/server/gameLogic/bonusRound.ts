@@ -26,17 +26,17 @@ export { handleCollectiveListTimeout as handleBonusRoundTimeout } from './collec
 /**
  * Startet eine Bonusrunde basierend auf dem Fragetyp
  */
-export function startBonusRound(room: GameRoom, io: SocketServer, config: BonusRoundConfig): void {
+export async function startBonusRound(room: GameRoom, io: SocketServer, config: BonusRoundConfig): Promise<void> {
   const questionType = config.questionType?.toLowerCase() || 'liste';
-  
+
   console.log(`🎯 Starting bonus round: ${config.questionType || 'Liste'}`);
-  
+
   // Route to appropriate implementation
   if (questionType === 'hot button' || questionType === 'hot_button' || questionType === 'buzzer') {
     startHotButtonRound(room, io, config);
   } else {
     // Default: Collective List
-    startCollectiveListRound(room, io, config);
+    await startCollectiveListRound(room, io, config);
   }
 }
 

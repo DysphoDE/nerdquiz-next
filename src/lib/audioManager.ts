@@ -369,6 +369,44 @@ class AudioManager {
   }
 
   /**
+   * Spielt eine server-generierte TTS-Datei über URL ab.
+   * Nutzt den gleichen TTS-Kanal (stoppt bestehende TTS).
+   *
+   * @param url - URL der gecachten TTS-Datei (z.B. /audio/tts-cache/xyz.mp3)
+   * @returns Promise die resolved wenn die Wiedergabe beendet ist
+   */
+  playTTSFromUrl(url: string): Promise<void> {
+    // Stop any existing TTS playback
+    this.stopTTS();
+
+    return new Promise<void>((resolve) => {
+      const howl = new Howl({
+        src: [url],
+        format: ['mp3'],
+        volume: this.masterVolume * this.ttsVolume * TTS_VOLUME_GAIN.API_TTS,
+        html5: true,
+        onend: () => {
+          this.currentTTS = null;
+          resolve();
+        },
+        onloaderror: (_id, error) => {
+          console.warn('[AudioManager] TTS URL load error:', error);
+          this.currentTTS = null;
+          resolve(); // Resolve anyway — TTS is nice-to-have
+        },
+        onplayerror: (_id, error) => {
+          console.warn('[AudioManager] TTS URL play error:', error);
+          this.currentTTS = null;
+          resolve();
+        },
+      });
+
+      this.currentTTS = howl;
+      howl.play();
+    });
+  }
+
+  /**
    * Stoppt aktuell laufende TTS-Wiedergabe und bricht laufende Requests ab.
    */
   stopTTS(): void {
@@ -406,13 +444,14 @@ class AudioManager {
   // ============================================
 
   /**
-   * Spielt einen zufälligen vorproduzierten Moderator-Clip aus einer Kategorie ab.
+   * Spielt einen vorproduzierten Moderator-Clip aus einer Kategorie ab.
    * Nutzt den TTS-Lautstärkekanal. Vermeidet direkte Wiederholung des gleichen Clips.
    *
    * @param category - Die Snippet-Kategorie (z.B. 'correct', 'wrong', 'welcome')
+   * @param snippetIndex - Optional: Server-generierter Index für synchrone Wiedergabe
    * @returns Promise die resolved wenn die Wiedergabe beendet ist
    */
-  playModeratorSnippet(category: TtsSnippetCategory): Promise<void> {
+  playModeratorSnippet(category: TtsSnippetCategory, snippetIndex?: number): Promise<void> {
     // Stop any currently playing snippet to prevent overlapping playback
     this.stopCurrentSnippet();
 
@@ -425,15 +464,20 @@ class AudioManager {
       }
       const fileCount = files.length;
 
-      // Pick a random index, avoiding the last one played
       let index: number;
-      const lastIndex = this.lastSnippetIndex.get(category) ?? -1;
-      if (fileCount === 1) {
-        index = 0;
+      if (snippetIndex !== undefined) {
+        // Use server-provided index for synchronized playback across clients
+        index = snippetIndex % fileCount;
       } else {
-        do {
-          index = Math.floor(Math.random() * fileCount);
-        } while (index === lastIndex);
+        // Pick a random index, avoiding the last one played
+        const lastIndex = this.lastSnippetIndex.get(category) ?? -1;
+        if (fileCount === 1) {
+          index = 0;
+        } else {
+          do {
+            index = Math.floor(Math.random() * fileCount);
+          } while (index === lastIndex);
+        }
       }
       this.lastSnippetIndex.set(category, index);
 

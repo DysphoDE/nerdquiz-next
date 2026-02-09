@@ -45,7 +45,7 @@ export function useSocket() {
     setCollectiveListResult,
     setHotButtonBuzz,
     setHotButtonEndResult,
-    setScoreboardTtsText,
+    setScoreboardTtsUrl,
     resetQuestion,
     reset,
   } = useGameStore();
@@ -136,9 +136,9 @@ export function useSocket() {
       // Redirect will happen via the component that detects null room
     };
 
-    const handleScoreboardAnnouncement = (data: { ttsText: string }) => {
+    const handleScoreboardAnnouncement = (data: { ttsUrl: string | null }) => {
       console.log('📊 Scoreboard announcement received');
-      setScoreboardTtsText(data.ttsText);
+      setScoreboardTtsUrl(data.ttsUrl);
     };
 
     const handleRematchResult = (data: { rematch: boolean; newHostId?: string; newHostName?: string }) => {
@@ -193,7 +193,7 @@ export function useSocket() {
       socket.off('scoreboard_announcement', handleScoreboardAnnouncement);
       socket.off('rematch_result', handleRematchResult);
     };
-  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setCollectiveListResult, setHotButtonBuzz, setHotButtonEndResult, setScoreboardTtsText, resetQuestion, reset]);
+  }, [setConnected, setRoom, setLastResults, setFinalRankings, setGameStatistics, setCollectiveListResult, setHotButtonBuzz, setHotButtonEndResult, setScoreboardTtsUrl, resetQuestion, reset]);
 
   // === API Methods ===
   // All methods automatically get roomCode and playerId from store

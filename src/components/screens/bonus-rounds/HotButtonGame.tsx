@@ -356,19 +356,38 @@ export function HotButtonGame() {
   const { buzzHotButton, submitHotButtonAnswer } = useSocket();
   const { room, playerId, hotButtonBuzz, hotButtonEndResult } = useGameStore();
   const players = usePlayers();
-  const { playMusic, playSfx } = useAudio();
+  const { playMusic, playSfx, playTTSFromUrl, stopTTS } = useAudio();
 
   const [inputValue, setInputValue] = useState('');
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const hotButton = room?.bonusRound as HotButtonBonusRound | null;
 
   // Play hot button music when entering
   useEffect(() => {
     playMusic('hotButton');
   }, [playMusic]);
 
+  // TTS: Play question audio when reveal starts (once per question)
+  const ttsPlayedForQuestion = useRef(-1);
+
+  useEffect(() => {
+    if (hotButton?.phase === 'question_reveal' && room?.ttsUrl
+        && ttsPlayedForQuestion.current !== hotButton.currentQuestionIndex) {
+      ttsPlayedForQuestion.current = hotButton.currentQuestionIndex;
+      playTTSFromUrl(room.ttsUrl);
+    }
+  }, [hotButton?.phase, hotButton?.currentQuestionIndex, room?.ttsUrl, playTTSFromUrl]);
+
+  // TTS: Stop when someone buzzes
+  useEffect(() => {
+    if (hotButton?.buzzedPlayerId) {
+      stopTTS();
+    }
+  }, [hotButton?.buzzedPlayerId, stopTTS]);
+
   // Determine which timer to use based on phase
-  const hotButton = room?.bonusRound as HotButtonBonusRound | null;
   const isRevealing = hotButton?.phase === 'question_reveal' || hotButton?.phase === 'buzzer_active';
   const isAnswering = hotButton?.phase === 'answering';
   

@@ -322,6 +322,10 @@ export interface GameState {
   usedBonusQuestionIds: Set<string>;
   usedCategoryIds: Set<string>; // Track played categories for better variety
   rematchVotes: Map<string, 'yes' | 'no'>;
+  // Snippet index for synchronized audio playback across clients
+  snippetIndex: number;
+  // Server-generated TTS URL for current phase (question, estimation, collective list intro)
+  ttsUrl: string | null;
   // Game Statistics (tracked during gameplay)
   statistics: GameStatistics;
 }
@@ -531,6 +535,8 @@ export function createInitialGameState(): GameState {
     usedBonusQuestionIds: new Set(),
     usedCategoryIds: new Set(),
     rematchVotes: new Map(),
+    snippetIndex: 0,
+    ttsUrl: null,
     statistics: createInitialGameStatistics(),
   };
 }

@@ -35,7 +35,7 @@ export function QuestionScreen() {
   const players = usePlayers();
   const currentPlayer = useCurrentPlayer();
   const isHost = useIsHost();
-  const { playMusic, playSfx, playTTS, stopTTS, playModeratorSnippet } = useAudio();
+  const { playMusic, playSfx, playTTSFromUrl, stopTTS, playModeratorSnippet } = useAudio();
   const myResult = useMyResult();
   
   const [revealPhase, setRevealPhase] = useState<RevealPhase>('answering');
@@ -230,27 +230,24 @@ export function QuestionScreen() {
     }
   }, [room?.phase, room?.currentQuestionIndex, playMusic]);
 
-  // TTS: Frage vorlesen wenn sie erscheint
+  // TTS: Frage vorlesen wenn sie erscheint (server-generierte URL)
   useEffect(() => {
-    if (room?.phase === 'question' && question?.text) {
-      playTTS(question.text, {
-        instructionKey: 'QUESTION',
-        questionId: question.id,
-      });
+    if (room?.phase === 'question' && room?.ttsUrl) {
+      playTTSFromUrl(room.ttsUrl);
     }
     // TTS stoppen wenn Reveal beginnt
     if (room?.phase === 'revealing') {
       stopTTS();
     }
-  }, [room?.phase, room?.currentQuestionIndex, question?.text, question?.id, playTTS, stopTTS]);
+  }, [room?.phase, room?.currentQuestionIndex, room?.ttsUrl, playTTSFromUrl, stopTTS]);
 
   // Play correct/wrong SFX + Moderator snippet when answer is revealed
   useEffect(() => {
     if (revealPhase === 'revealing' && myResult) {
       playSfx(myResult.correct ? 'correct' : 'wrong');
-      playModeratorSnippet(myResult.correct ? 'correct' : 'wrong');
+      playModeratorSnippet(myResult.correct ? 'correct' : 'wrong', room?.snippetIndex);
     }
-  }, [revealPhase, myResult, playSfx, playModeratorSnippet]);
+  }, [revealPhase, myResult, playSfx, playModeratorSnippet, room?.snippetIndex]);
 
   // Reset on new question
   useEffect(() => {

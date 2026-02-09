@@ -28,6 +28,7 @@ import {
   GAME_TIMERS,
 } from '@/config/constants';
 import { generateScoreboardAnnouncement } from './scoreboardAnnouncement';
+import { generateAndCache } from '../ttsService';
 import {
   selectCategoryMode,
   getRandomCategoriesForVoting,
@@ -210,9 +211,12 @@ async function startBonusRoundByType(
     maxRebuzzAttempts: bonusQuestion.maxRebuzzAttempts,
   };
   
+  // Generate snippet index for synchronized welcome audio across clients
+  room.state.snippetIndex = Math.floor(Math.random() * 10000);
+
   emitPhaseChange(room, io, 'bonus_round_announcement');
   broadcastRoomUpdate(room, io);
-  
+
   // After roulette animation, start bonus round
   const roomCode = room.code;
   schedulePostAnnouncementAction(room, () => {
@@ -298,7 +302,9 @@ async function startQuestionRound(
 
   // First show announcement
   room.state.phase = 'category_announcement';
-  
+  // Generate snippet index for synchronized welcome audio across clients
+  room.state.snippetIndex = Math.floor(Math.random() * 10000);
+
   let announcementData: Record<string, any> = { mode };
   
   if (mode === 'losers_pick') {
@@ -453,7 +459,7 @@ const SCOREBOARD_TTS_FALLBACK = 30000;
  * Bei mehreren Spielern wird eine TTS-Ansage generiert und
  * nach Abspielen automatisch zur nächsten Runde gewechselt.
  */
-export function showScoreboard(room: GameRoom, io: SocketServer): void {
+export async function showScoreboard(room: GameRoom, io: SocketServer): Promise<void> {
   room.state.phase = 'scoreboard';
   room.state.currentQuestion = null;
   room.state.timerEnd = null;
@@ -466,12 +472,21 @@ export function showScoreboard(room: GameRoom, io: SocketServer): void {
 
   const ttsText = generateScoreboardAnnouncement(sortedPlayers);
 
+  // Pre-generate TTS on server
+  let ttsUrl: string | null = null;
+  if (ttsText) {
+    ttsUrl = await generateAndCache(
+      ttsText,
+      `scoreboard-${room.code}-${room.state.currentRound}`
+    );
+  }
+
   emitPhaseChange(room, io, 'scoreboard');
   broadcastRoomUpdate(room, io);
 
   if (ttsText) {
-    // Send TTS text to clients
-    io.to(room.code).emit('scoreboard_announcement', { ttsText });
+    // Send TTS URL to clients (instead of raw text)
+    io.to(room.code).emit('scoreboard_announcement', { ttsUrl });
 
     // Set up callback + fallback for auto-advance after TTS
     const roomCode = room.code;

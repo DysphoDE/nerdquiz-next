@@ -15,7 +15,7 @@ export function EstimationScreen() {
   const { room, hasSubmitted, setHasSubmitted, estimationValue, setEstimationValue } = useGameStore();
   const players = usePlayers();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { playMusic, playTTS, stopTTS } = useAudio();
+  const { playMusic, playTTSFromUrl, stopTTS } = useAudio();
 
   const question = room?.currentQuestion;
   const answeredCount = players.filter(p => p.hasAnswered).length;
@@ -25,18 +25,15 @@ export function EstimationScreen() {
     playMusic('estimation');
   }, [playMusic]);
 
-  // TTS: Schätzfrage vorlesen wenn sie erscheint
+  // TTS: Schätzfrage vorlesen wenn sie erscheint (server-generierte URL)
   useEffect(() => {
-    if (question?.text) {
-      playTTS(question.text, {
-        instructionKey: 'ESTIMATION',
-        questionId: question.id,
-      });
+    if (room?.ttsUrl) {
+      playTTSFromUrl(room.ttsUrl);
     }
     return () => {
       stopTTS();
     };
-  }, [question?.text, question?.id, playTTS, stopTTS]);
+  }, [room?.ttsUrl, playTTSFromUrl, stopTTS]);
 
   // Synchronized timer using server time
   const { remaining: timeLeft } = useGameTimer(room?.timerEnd ?? null, room?.serverTime);

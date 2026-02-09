@@ -367,7 +367,7 @@ export default function RoomPage() {
   // announcement screen never flashes even for a single frame.
   useLayoutEffect(() => {
     if (gameStartPending) {
-      ttsPromiseRef.current = playModeratorSnippet('welcome');
+      ttsPromiseRef.current = playModeratorSnippet('welcome', room?.snippetIndex);
       setShowStartAnimation(true);
       playSfx('fanfare');
       clearGameStartPending();

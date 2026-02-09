@@ -279,6 +279,10 @@ export interface RoomState {
   showingCorrectAnswer: boolean;
   wheelSelectedIndex: number | null; // Pre-selected wheel index for animation
   rematchVotes: Record<string, 'yes' | 'no'>; // Rematch voting state
+  /** Server-generated snippet index for synchronized audio playback */
+  snippetIndex?: number;
+  /** Server-generated TTS URL for current phase (question, estimation, collective list intro) */
+  ttsUrl?: string | null;
   /** Server-Zeit zum Zeitpunkt des letzten Updates (für Timer-Synchronisation) */
   serverTime?: number;
 }

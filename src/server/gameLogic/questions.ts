@@ -22,6 +22,7 @@ import {
   CHOICE_SCORING,
   ESTIMATION_SCORING,
 } from '@/config/constants';
+import { generateAndCache } from '../ttsService';
 
 // ============================================
 // STATISTICS HELPER
@@ -134,6 +135,9 @@ export async function startQuestion(room: GameRoom, io: SocketServer): Promise<v
     room.state.currentQuestion = question;
     room.state.showingCorrectAnswer = false;
     room.state.timerEnd = Date.now() + (room.settings.timePerQuestion * 1000);
+
+    // Pre-generate TTS on server (single API call for all clients)
+    room.state.ttsUrl = await generateAndCache(question.text, question.id);
 
     emitPhaseChange(room, io, room.state.phase);
     broadcastRoomUpdate(room, io);
@@ -286,6 +290,8 @@ export function showAnswer(room: GameRoom, io: SocketServer): void {
   room.state.phase = 'revealing';
   room.state.showingCorrectAnswer = true;
   room.state.timerEnd = null;
+  // Generate snippet index for synchronized correct/wrong audio across clients
+  room.state.snippetIndex = Math.floor(Math.random() * 10000);
 
   const question = room.state.currentQuestion;
   if (!question) return;
@@ -405,6 +411,8 @@ export function showEstimationAnswer(room: GameRoom, io: SocketServer): void {
   room.state.phase = 'estimation_reveal';
   room.state.showingCorrectAnswer = true;
   room.state.timerEnd = null;
+  // Generate snippet index for synchronized correct/wrong audio across clients
+  room.state.snippetIndex = Math.floor(Math.random() * 10000);
 
   const question = room.state.currentQuestion;
   if (!question || question.correctValue === undefined) return;

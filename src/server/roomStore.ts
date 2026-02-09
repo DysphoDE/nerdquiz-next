@@ -375,6 +375,8 @@ export function roomToClient(room: GameRoom): RoomState {
     timerEnd: room.state.timerEnd,
     showingCorrectAnswer: room.state.showingCorrectAnswer,
     wheelSelectedIndex: room.state.wheelSelectedIndex,
+    snippetIndex: room.state.snippetIndex,
+    ttsUrl: room.state.ttsUrl ?? null,
     rematchVotes: Object.fromEntries(room.state.rematchVotes),
   };
 }

@@ -448,10 +448,9 @@ export function CollectiveListGame() {
   const { submitCollectiveListAnswer, skipCollectiveListTurn, emitCollectiveListIntroDone } = useSocket();
   const { room, playerId, collectiveListResult } = useGameStore();
   const players = usePlayers();
-  const { playMusic, playSfx, playTTS, playModeratorSnippet } = useAudio();
+  const { playMusic, playSfx, playTTSFromUrl, playModeratorSnippet } = useAudio();
   
   const [inputValue, setInputValue] = useState('');
-  const [lastResult, setLastResult] = useState<'correct' | 'wrong' | 'already_guessed' | null>(null);
   const lastProcessedGuessRef = useRef<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -501,25 +500,24 @@ export function CollectiveListGame() {
   useEffect(() => {
     if (isIntro && introSubPhase === 'rules' && !introSnippetStarted.current) {
       introSnippetStarted.current = true;
-      playModeratorSnippet('list-intro' as TtsSnippetCategory)
+      playModeratorSnippet('list-intro' as TtsSnippetCategory, room?.snippetIndex)
         .then(() => {
           setIntroSubPhase('topic');
         });
     }
-  }, [isIntro, introSubPhase, playModeratorSnippet]);
+  }, [isIntro, introSubPhase, playModeratorSnippet, room?.snippetIndex]);
 
-  // Phase 2: Play TTS reading the question when topic sub-phase starts
+  // Phase 2: Play TTS reading the question when topic sub-phase starts (server-generierte URL)
   useEffect(() => {
     if (isIntro && introSubPhase === 'topic' && bonusRound?.description) {
       const startTime = Date.now();
       const MIN_DISPLAY_MS = 5000; // Minimum 5 seconds to read the question
 
-      const ttsText = bonusRound.topic
-        ? `${bonusRound.topic}! ${bonusRound.description}`
-        : bonusRound.description;
+      const ttsPromise = room?.ttsUrl
+        ? playTTSFromUrl(room.ttsUrl)
+        : Promise.resolve();
 
-      playTTS(ttsText, { instructionKey: 'ANNOUNCEMENT' })
-        .then(() => {
+      ttsPromise.then(() => {
           const elapsed = Date.now() - startTime;
           const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
           setTimeout(() => {
@@ -531,16 +529,18 @@ export function CollectiveListGame() {
           }, remaining);
         });
     }
-  }, [isIntro, introSubPhase, bonusRound?.topic, bonusRound?.description, playTTS, emitCollectiveListIntroDone]);
+  }, [isIntro, introSubPhase, bonusRound?.description, room?.ttsUrl, playTTSFromUrl, emitCollectiveListIntroDone]);
 
-  // Play SFX for correct/wrong answers
+  // Play SFX for correct/wrong answers — for ALL players, synced to reveal animation
   useEffect(() => {
-    if (lastResult === 'correct') {
+    if (!answerPopup || gridRevealPhase !== 'revealed') return;
+
+    if (answerPopup.result === 'correct') {
       playSfx('correct');
-    } else if (lastResult === 'wrong' || lastResult === 'already_guessed') {
+    } else if (answerPopup.result === 'wrong' || answerPopup.result === 'already_guessed') {
       playSfx('wrong');
     }
-  }, [lastResult, playSfx]);
+  }, [gridRevealPhase, answerPopup, playSfx]);
 
   // Auto-focus input when it's my turn
   useEffect(() => {
@@ -548,14 +548,6 @@ export function CollectiveListGame() {
       inputRef.current.focus();
     }
   }, [isMyTurn]);
-
-  // Clear last result after delay
-  useEffect(() => {
-    if (lastResult) {
-      const timer = setTimeout(() => setLastResult(null), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [lastResult]);
 
   // Nach der initialen Grid-Animation den Flag setzen, damit nachfolgende Updates keine Animation mehr triggern
   useEffect(() => {
@@ -627,17 +619,6 @@ export function CollectiveListGame() {
     if (lastProcessedGuessRef.current === guessId) return;
     lastProcessedGuessRef.current = guessId;
     
-    // Set personal result feedback
-    if (guess.playerId === playerId) {
-      if (guess.result === 'correct') {
-        setLastResult('correct');
-      } else if (guess.result === 'wrong') {
-        setLastResult('wrong');
-      } else if (guess.result === 'already_guessed') {
-        setLastResult('already_guessed');
-      }
-    }
-    
     // Zeige Popup für die letzte Antwort (für alle Spieler sichtbar)
     const player = players.find(p => p.id === guess.playerId);
     if (player) {
@@ -658,7 +639,7 @@ export function CollectiveListGame() {
         }
       }
     }
-  }, [bonusRound?.lastGuess, playerId, players, bonusRound?.items]);
+  }, [bonusRound?.lastGuess, players, bonusRound?.items]);
 
   // Check if input matches an already guessed item (exact match against display or aliases)
   const checkForDuplicate = (value: string): string | null => {

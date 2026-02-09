@@ -148,6 +148,10 @@ export function useAudio() {
     return audioManager.playTTS(text, options).catch(() => {});
   }, []);
 
+  const playTTSFromUrl = useCallback((url: string): Promise<void> => {
+    return audioManager.playTTSFromUrl(url);
+  }, []);
+
   const stopTTS = useCallback(() => {
     audioManager.stopTTS();
   }, []);
@@ -160,8 +164,8 @@ export function useAudio() {
     audioManager.preloadSfx(keys);
   }, []);
 
-  const playModeratorSnippet = useCallback((category: TtsSnippetCategory): Promise<void> => {
-    return audioManager.playModeratorSnippet(category);
+  const playModeratorSnippet = useCallback((category: TtsSnippetCategory, snippetIndex?: number): Promise<void> => {
+    return audioManager.playModeratorSnippet(category, snippetIndex);
   }, []);
 
   const preloadSnippets = useCallback((categories: TtsSnippetCategory[]) => {
@@ -174,6 +178,7 @@ export function useAudio() {
     stopMusic,
     playSfx,
     playTTS,
+    playTTSFromUrl,
     stopTTS,
     playModeratorSnippet,
     preloadMusic,

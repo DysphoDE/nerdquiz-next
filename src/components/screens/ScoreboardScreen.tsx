@@ -63,34 +63,33 @@ interface PlayerWithRankChange {
 export function ScoreboardScreen() {
   const { next, emitScoreboardTtsDone } = useSocket();
   const { room } = useGameStore();
-  const scoreboardTtsText = useGameStore((s) => s.scoreboardTtsText);
-  const setScoreboardTtsText = useGameStore((s) => s.setScoreboardTtsText);
+  const scoreboardTtsUrl = useGameStore((s) => s.scoreboardTtsUrl);
+  const setScoreboardTtsUrl = useGameStore((s) => s.setScoreboardTtsUrl);
   const isHost = useIsHost();
   const unsortedPlayers = usePlayers();
-  const { playMusic, playTTS, stopTTS } = useAudio();
+  const { playMusic, playTTSFromUrl, stopTTS } = useAudio();
 
   // Play scoreboard music when entering
   useEffect(() => {
     playMusic('scoreboard');
   }, [playMusic]);
 
-  // Play TTS announcement when text is set
+  // Play TTS announcement when URL is set (server-generierte Datei)
   useEffect(() => {
-    if (!scoreboardTtsText) return;
-    const text = scoreboardTtsText;
+    if (!scoreboardTtsUrl) return;
 
-    playTTS(text, { instructionKey: 'SCOREBOARD' }).then(() => {
+    playTTSFromUrl(scoreboardTtsUrl).then(() => {
       emitScoreboardTtsDone();
-      setScoreboardTtsText(null);
+      setScoreboardTtsUrl(null);
     });
-  }, [scoreboardTtsText, playTTS, emitScoreboardTtsDone, setScoreboardTtsText]);
+  }, [scoreboardTtsUrl, playTTSFromUrl, emitScoreboardTtsDone, setScoreboardTtsUrl]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      setScoreboardTtsText(null);
+      setScoreboardTtsUrl(null);
     };
-  }, [setScoreboardTtsText]);
+  }, [setScoreboardTtsUrl]);
   
   // Track previous scores & ranks to calculate real rank changes
   const previousSnapshotRef = useRef<Map<string, { score: number; rank: number }> | null>(null);
@@ -134,9 +133,9 @@ export function ScoreboardScreen() {
   const handleNext = useCallback(() => {
     if (!room || !isHost) return;
     stopTTS();
-    setScoreboardTtsText(null);
+    setScoreboardTtsUrl(null);
     next();
-  }, [room, isHost, stopTTS, setScoreboardTtsText, next]);
+  }, [room, isHost, stopTTS, setScoreboardTtsUrl, next]);
 
   const isFinalRound = room && room.currentRound >= room.settings.maxRounds;
   const leader = players[0];

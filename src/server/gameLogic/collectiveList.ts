@@ -26,6 +26,7 @@ import {
   MATCHING,
   UI_TIMING,
 } from '@/config/constants';
+import { generateAndCache } from '../ttsService';
 
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -36,7 +37,7 @@ const dev = process.env.NODE_ENV !== 'production';
 /**
  * Startet eine Collective List Bonusrunde
  */
-export function startCollectiveListRound(room: GameRoom, io: SocketServer, config: BonusRoundConfig): void {
+export async function startCollectiveListRound(room: GameRoom, io: SocketServer, config: BonusRoundConfig): Promise<void> {
   const roomCode = room.code;
   
   if (!config.items || config.items.length === 0) {
@@ -85,6 +86,20 @@ export function startCollectiveListRound(room: GameRoom, io: SocketServer, confi
   };
 
   room.state.phase = 'bonus_round';
+  // Generate snippet index for synchronized list-intro audio across clients
+  room.state.snippetIndex = Math.floor(Math.random() * 10000);
+
+  // Pre-generate TTS for topic intro on server
+  if (config.description) {
+    const ttsText = config.topic
+      ? `${config.topic}! ${config.description}`
+      : config.description;
+    const cacheId = config.id || `cl-${room.code}-${Date.now()}`;
+    room.state.ttsUrl = await generateAndCache(ttsText, cacheId);
+  } else {
+    room.state.ttsUrl = null;
+  }
+
   emitPhaseChange(room, io, 'bonus_round');
   broadcastRoomUpdate(room, io);
 
