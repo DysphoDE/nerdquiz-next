@@ -198,6 +198,7 @@ export interface HotButtonQuestionResult {
 export interface ServerHotButtonState {
   type: 'hot_button';
   phase: 'intro' | 'question_reveal' | 'buzzer_active' | 'answering' | 'result' | 'finished';
+  skipRulesIntro: boolean; // true = rules already explained this room, skip to topic
   questionId?: string; // DB ID
   topic: string;
   description?: string;

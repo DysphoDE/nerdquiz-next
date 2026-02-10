@@ -192,6 +192,7 @@ export interface HotButtonQuestionResult {
 export interface HotButtonBonusRound {
   type: 'hot_button';
   phase: 'intro' | 'question_reveal' | 'buzzer_active' | 'answering' | 'result' | 'finished';
+  skipRulesIntro?: boolean; // true = rules already explained, skip to topic reveal
   questionId?: string;
   topic: string;
   description?: string;

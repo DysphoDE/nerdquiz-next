@@ -56,9 +56,17 @@ export function startHotButtonRound(room: GameRoom, io: SocketServer, config: Bo
 
   const description = `${questions.length} Fragen aus verschiedenen Kategorien. Buzzere schnell für Bonus-Punkte!`;
 
+  // Check if rules have already been explained this room
+  if (!room.explainedBonusIntros) {
+    room.explainedBonusIntros = new Set();
+  }
+  const skipRulesIntro = room.explainedBonusIntros.has('hot_button');
+  room.explainedBonusIntros.add('hot_button');
+
   room.state.bonusRound = {
     type: 'hot_button',
     phase: 'intro',
+    skipRulesIntro,
     questionId: config.id,
     topic,
     description,
@@ -96,20 +104,32 @@ export function startHotButtonRound(room: GameRoom, io: SocketServer, config: Bo
   };
 
   room.state.phase = 'bonus_round';
+  // Generate snippet index for synchronized hotbutton-intro audio across clients
+  room.state.snippetIndex = Math.floor(Math.random() * 1000);
   emitPhaseChange(room, io, 'bonus_round');
   broadcastRoomUpdate(room, io);
 
-  console.log(`⚡ Hot Button Round started: ${topic}`);
+  console.log(`⚡ Hot Button Round started: ${topic} (skipRulesIntro: ${skipRulesIntro})`);
   console.log(`   ${questions.length} questions, ${config.buzzerTimeout || (HOT_BUTTON_TIMING.BUZZER_TIMEOUT / 1000)}s buzzer timeout`);
 
-  // After intro, start first question (longer delay so players can read rules)
-  setTimeout(() => {
+  // Wait for client to signal that intro TTS is done (with fallback timeout)
+  const startPlaying = () => {
     const { getRoom } = require('../roomStore');
     const currentRoom = getRoom(roomCode);
     if (currentRoom?.state.bonusRound && currentRoom.state.bonusRound.type === 'hot_button' && currentRoom.state.bonusRound.phase === 'intro') {
       startNextQuestion(currentRoom, io);
     }
-  }, HOT_BUTTON_TIMING.INTRO);
+  };
+
+  room.introReadyCallback = startPlaying;
+  room.introReadyTimeout = setTimeout(() => {
+    if (room.introReadyCallback) {
+      console.log(`⏰ Hot Button intro timeout reached for room ${roomCode}, starting anyway`);
+      room.introReadyCallback();
+      room.introReadyCallback = undefined;
+      room.introReadyTimeout = undefined;
+    }
+  }, 30000); // 30s generous fallback
 }
 
 // ============================================

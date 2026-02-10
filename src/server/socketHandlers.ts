@@ -212,6 +212,22 @@ export function setupSocketHandlers(io: SocketServer): void {
       callback();
     });
 
+    // === HOT BUTTON INTRO DONE (client TTS finished) ===
+    socket.on('hot_button_intro_done', (data: { roomCode: string }) => {
+      if (!data?.roomCode) return;
+      const room = getRoom(data.roomCode);
+      if (!room?.introReadyCallback) return;
+
+      console.log(`⚡ Hot Button intro done received for room ${room.code}`);
+      if (room.introReadyTimeout) {
+        clearTimeout(room.introReadyTimeout);
+        room.introReadyTimeout = undefined;
+      }
+      const callback = room.introReadyCallback;
+      room.introReadyCallback = undefined;
+      callback();
+    });
+
     // === TIME SYNC ===
     socket.on('time_sync_request', (data: { clientTime: number }) => {
       handleTimeSyncRequest(socket, data.clientTime);

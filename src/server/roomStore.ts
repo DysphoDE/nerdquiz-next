@@ -309,6 +309,7 @@ export function roomToClient(room: GameRoom): RoomState {
       bonusRoundClient = {
         type: 'hot_button' as const,
         phase: br.phase,
+        skipRulesIntro: br.skipRulesIntro,
         questionId: br.questionId,
         topic: br.topic,
         description: br.description,

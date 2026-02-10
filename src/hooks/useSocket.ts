@@ -388,6 +388,14 @@ export function useSocket() {
     socket.emit('collective_list_intro_done', { roomCode });
   }, []);
 
+  const emitHotButtonIntroDone = useCallback(() => {
+    const socket = getSocket();
+    const { roomCode } = useGameStore.getState();
+    if (!roomCode) return;
+    console.log('⚡ Emitting hot_button_intro_done');
+    socket.emit('hot_button_intro_done', { roomCode });
+  }, []);
+
   const emitScoreboardTtsDone = useCallback(() => {
     const socket = getSocket();
     const { roomCode } = useGameStore.getState();
@@ -417,6 +425,7 @@ export function useSocket() {
     voteRematch,
     emitGameStartReady,
     emitCollectiveListIntroDone,
+    emitHotButtonIntroDone,
     emitScoreboardTtsDone,
   };
 }

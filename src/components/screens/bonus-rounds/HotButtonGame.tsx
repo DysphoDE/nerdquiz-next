@@ -12,6 +12,7 @@ import { GameAvatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useAudio } from '@/hooks/useAudio';
 import type { HotButtonBonusRound, HotButtonQuestionResult } from '@/types/game';
+import type { TtsSnippetCategory } from '@/config/audioRegistry';
 
 /**
  * HotButtonGame - "Hot Button" Bonusrunden-Spieltyp (Redesigned)
@@ -353,21 +354,62 @@ function NoBuzzResultOverlay({ correctAnswer, questionText }: { correctAnswer: s
 }
 
 export function HotButtonGame() {
-  const { buzzHotButton, submitHotButtonAnswer } = useSocket();
+  const { buzzHotButton, submitHotButtonAnswer, emitHotButtonIntroDone } = useSocket();
   const { room, playerId, hotButtonBuzz, hotButtonEndResult } = useGameStore();
   const players = usePlayers();
-  const { playMusic, playSfx, playTTSFromUrl, stopTTS } = useAudio();
+  const { playMusic, playSfx, playTTSFromUrl, playModeratorSnippet, stopTTS } = useAudio();
 
   const [inputValue, setInputValue] = useState('');
   const [showHistoryMobile, setShowHistoryMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const hotButton = room?.bonusRound as HotButtonBonusRound | null;
+  const isIntro = hotButton?.phase === 'intro';
+
+  // === INTRO SUB-PHASES ===
+  // 'rules'  → Show game explanation + play hotbutton-intro snippet (skipped on repeat)
+  // 'topic'  → Reveal topic/description
+  // 'done'   → Waiting for server to start first question
+  const skipRules = hotButton?.skipRulesIntro ?? false;
+  const [introSubPhase, setIntroSubPhase] = useState<'rules' | 'topic' | 'done'>(skipRules ? 'topic' : 'rules');
+  const introSignalSent = useRef(false);
+  const introSnippetStarted = useRef(false);
 
   // Play hot button music when entering
   useEffect(() => {
     playMusic('hotButton');
   }, [playMusic]);
+
+  // Phase 1: Play hotbutton-intro snippet when entering intro
+  useEffect(() => {
+    if (isIntro && introSubPhase === 'rules' && !introSnippetStarted.current) {
+      introSnippetStarted.current = true;
+      playModeratorSnippet('hotbutton-intro' as TtsSnippetCategory, room?.snippetIndex)
+        .then(() => {
+          setIntroSubPhase('topic');
+        });
+    }
+  }, [isIntro, introSubPhase, playModeratorSnippet, room?.snippetIndex]);
+
+  // Phase 2: Show topic, then signal server we're ready
+  useEffect(() => {
+    if (isIntro && introSubPhase === 'topic') {
+      const MIN_DISPLAY_MS = 4000; // Minimum 4 seconds to read topic
+      const startTime = Date.now();
+
+      setTimeout(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
+        setTimeout(() => {
+          setIntroSubPhase('done');
+          if (!introSignalSent.current) {
+            introSignalSent.current = true;
+            emitHotButtonIntroDone();
+          }
+        }, remaining);
+      }, MIN_DISPLAY_MS);
+    }
+  }, [isIntro, introSubPhase, emitHotButtonIntroDone]);
 
   // TTS: Play question audio when reveal starts (once per question)
   const ttsPlayedForQuestion = useRef(-1);
@@ -402,7 +444,6 @@ export function HotButtonGame() {
   const showBuzzerOverlay = hotButtonBuzz !== null;
 
   const isBuzzed = hotButton?.buzzedPlayerId === playerId;
-  const isIntro = hotButton?.phase === 'intro';
   const isResult = hotButton?.phase === 'result';
   const isFinished = hotButton?.phase === 'finished';
 
@@ -556,55 +597,213 @@ export function HotButtonGame() {
             </div>
           </div>
 
-          {/* Intro Phase */}
+          {/* Intro Phase - Sub-Phases: rules → topic → done */}
           {isIntro && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex-1 flex items-center justify-center"
-            >
-              <Card className="glass p-8 max-w-2xl w-full text-center">
+            <>
+              {/* Sub-Phase: Rules - Ausführliche Spielerklärung (übersprungen bei Wiederholung) */}
+              {introSubPhase === 'rules' && (
                 <motion.div
-                  animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                  className="text-6xl mb-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                  className="mb-4"
                 >
-                  ⚡
+                  <Card className="glass p-5 sm:p-8 border-amber-500/30 bg-gradient-to-b from-amber-500/5 to-transparent overflow-hidden relative">
+                    {/* Subtle background glow */}
+                    <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-60 h-60 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                    
+                    <div className="relative space-y-5 sm:space-y-6">
+                      {/* Header */}
+                      <div className="text-center">
+                        <motion.div
+                          initial={{ scale: 0, rotate: -20 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                          className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 mb-3"
+                        >
+                          <span className="text-4xl sm:text-5xl">⚡</span>
+                        </motion.div>
+                        <motion.h2
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.15 }}
+                          className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-400 via-orange-400 to-red-500 bg-clip-text text-transparent"
+                        >
+                          HOT BUTTON
+                        </motion.h2>
+                        <motion.p
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.25 }}
+                          className="text-muted-foreground mt-1 text-sm sm:text-base"
+                        >
+                          Wer traut sich zu buzzern?
+                        </motion.p>
+                      </div>
+
+                      {/* Rules Grid */}
+                      <div className="grid gap-2.5 sm:gap-3">
+                        {[
+                          {
+                            icon: '🔍',
+                            title: 'Frage wird enthüllt',
+                            desc: <>Die Frage erscheint <strong className="text-foreground">Zeichen für Zeichen</strong>. Sobald du die Antwort weißt — buzz!</>,
+                            color: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
+                            delay: 0.3,
+                          },
+                          {
+                            icon: '⚡',
+                            title: 'Schnell buzzern = Bonus',
+                            desc: <>Drücke <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">SPACE</kbd> oder den Button. Je <strong className="text-foreground">früher du buzzerst</strong>, desto mehr Speed-Bonus kassierst du!</>,
+                            color: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
+                            delay: 0.4,
+                          },
+                          {
+                            icon: '🔄',
+                            title: 'Zweite Chance für andere',
+                            desc: <>Bei einer <strong className="text-foreground">falschen Antwort</strong> dürfen die anderen Spieler nochmal buzzern — die Frage läuft weiter!</>,
+                            color: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
+                            delay: 0.5,
+                          },
+                          {
+                            icon: '💀',
+                            title: 'Aber Vorsicht!',
+                            desc: <>Eine falsche Antwort kostet <strong className="text-red-400">-500 Punkte</strong>. Überlege gut, bevor du buzzerst!</>,
+                            color: 'from-red-500/10 to-red-500/5 border-red-500/20',
+                            delay: 0.6,
+                          },
+                        ].map((rule, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: rule.delay, duration: 0.35 }}
+                            className={cn(
+                              'flex items-start gap-3 p-3 sm:p-3.5 rounded-xl bg-gradient-to-r border backdrop-blur-sm',
+                              rule.color
+                            )}
+                          >
+                            <span className="text-xl sm:text-2xl mt-0.5 shrink-0">{rule.icon}</span>
+                            <div className="min-w-0">
+                              <p className="font-bold text-sm sm:text-base text-foreground leading-tight">{rule.title}</p>
+                              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed">{rule.desc}</p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+
+                      {/* Equalizer bars while moderator snippet plays */}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.8 }}
+                        className="flex items-center justify-center gap-3 pt-1"
+                      >
+                        <div className="flex items-end gap-1 h-7">
+                          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                              animate={{ height: ['4px', `${10 + (i % 4) * 4}px`, '4px'] }}
+                              transition={{
+                                duration: 0.5 + i * 0.08,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: i * 0.06,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground animate-pulse">Moderator erklärt...</span>
+                        <div className="flex items-end gap-1 h-7">
+                          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                              animate={{ height: ['4px', `${10 + ((i + 2) % 4) * 4}px`, '4px'] }}
+                              transition={{
+                                duration: 0.5 + i * 0.08,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: i * 0.06 + 0.15,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+                    </div>
+                  </Card>
                 </motion.div>
-                <h2 className="text-3xl font-bold mb-4">{hotButton.topic}</h2>
-                {hotButton.description && (
-                  <p className="text-lg text-muted-foreground mb-6">{hotButton.description}</p>
-                )}
-                <div className="glass rounded-xl p-4 mb-6">
-                  <p className="text-sm font-medium text-amber-500 mb-3">🎯 Wie funktioniert's?</p>
-                  <ul className="text-sm text-left space-y-2">
-                    <li className="flex items-start gap-2">
-                      <span className="text-amber-500 shrink-0">1.</span>
-                      <span>Die Frage wird Zeichen für Zeichen enthüllt</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-amber-500 shrink-0">2.</span>
-                      <span>Drücke <kbd className="px-2 py-0.5 bg-muted rounded text-xs font-mono">SPACE</kbd> oder den Button zum Buzzern</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-amber-500 shrink-0">3.</span>
-                      <span>Früher buzzern = mehr Speed-Bonus! (bis zu +500)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-red-500 shrink-0">⚠️</span>
-                      <span>Falsche Antwort: <strong>-500 Punkte!</strong></span>
-                    </li>
-                  </ul>
-                </div>
+              )}
+
+              {/* Sub-Phase: Topic - Thema/Beschreibung wird revealed */}
+              {(introSubPhase === 'topic' || introSubPhase === 'done') && (
                 <motion.div
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ repeat: Infinity, duration: 1.5 }}
-                  className="text-muted-foreground text-sm"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="mb-4"
                 >
-                  Die Runde startet gleich...
+                  <Card className={cn(
+                    "glass border-amber-500/30 bg-amber-500/5 transition-all p-5 sm:p-8"
+                  )}>
+                    <div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left gap-3 sm:gap-4">
+                      <motion.div
+                        animate={{ rotate: [0, -15, 15, 0], scale: [1, 1.1, 1] }}
+                        transition={{ repeat: Infinity, duration: 2 }}
+                        className="text-4xl sm:text-5xl shrink-0"
+                      >
+                        ⚡
+                      </motion.div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-xl sm:text-2xl text-amber-500 mb-1 sm:mb-2">
+                          {hotButton.topic}
+                        </h3>
+                        {hotButton.description && (
+                          <p className="text-base sm:text-xl text-foreground leading-relaxed">
+                            {hotButton.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3 text-muted-foreground text-sm sm:text-base justify-center sm:justify-start">
+                          <span className="px-1.5 sm:px-2 py-0.5 glass rounded-full">{hotButton.totalQuestions} Fragen</span>
+                          <span className="px-1.5 sm:px-2 py-0.5 glass rounded-full">bis zu +500 Speed-Bonus</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Status indicator */}
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mt-4">
+                    {introSubPhase === 'done' ? (
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ repeat: Infinity, duration: 1.2 }}
+                      >
+                        Gleich geht&apos;s los...
+                      </motion.span>
+                    ) : (
+                      <div className="flex items-end justify-center gap-1 h-6">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <motion.div
+                            key={i}
+                            className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                            animate={{ height: ['6px', `${12 + (i % 3) * 5}px`, '6px'] }}
+                            transition={{
+                              duration: 0.5 + i * 0.1,
+                              repeat: Infinity,
+                              ease: 'easeInOut',
+                              delay: i * 0.08,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
-              </Card>
-            </motion.div>
+              )}
+            </>
           )}
 
           {/* Question Phase */}

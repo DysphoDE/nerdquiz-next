@@ -884,66 +884,128 @@ export function CollectiveListGame() {
                 transition={{ delay: 0.2, duration: 0.5 }}
                 className="mb-4"
               >
-                <Card className="glass p-5 sm:p-8 border-amber-500/20">
-                  <div className="space-y-4 sm:space-y-5">
+                <Card className="glass p-5 sm:p-8 border-amber-500/30 bg-gradient-to-b from-amber-500/5 to-transparent overflow-hidden relative">
+                  {/* Subtle background glow */}
+                  <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-60 h-60 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="relative space-y-5 sm:space-y-6">
+                    {/* Header */}
                     <div className="text-center">
                       <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
+                        initial={{ scale: 0, rotate: -20 }}
+                        animate={{ scale: 1, rotate: 0 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                        className="text-5xl mb-3"
+                        className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 mb-3"
                       >
-                        📋
+                        <span className="text-4xl sm:text-5xl">📋</span>
                       </motion.div>
-                      <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+                      <motion.h2
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                        className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 bg-clip-text text-transparent"
+                      >
                         SAMMELLISTE
-                      </h2>
-                      <p className="text-muted-foreground mt-1 text-sm sm:text-base">So funktioniert&apos;s:</p>
+                      </motion.h2>
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.25 }}
+                        className="text-muted-foreground mt-1 text-sm sm:text-base"
+                      >
+                        Zeigt, was ihr draufhabt!
+                      </motion.p>
                     </div>
 
-                    <div className="space-y-2.5 sm:space-y-3">
-                      <div className="flex items-start gap-3 text-sm sm:text-base">
-                        <span className="text-lg mt-0.5 shrink-0">🔄</span>
-                        <span className="text-muted-foreground">Ihr nennt <strong className="text-foreground">reihum Begriffe</strong> zu einem vorgegebenen Thema.</span>
-                      </div>
-                      <div className="flex items-start gap-3 text-sm sm:text-base">
-                        <span className="text-lg mt-0.5 shrink-0">⏱️</span>
-                        <span className="text-muted-foreground">Pro Zug habt ihr nur <strong className="text-foreground">{bonusRound.timePerTurn} Sekunden</strong> Zeit.</span>
-                      </div>
-                      <div className="flex items-start gap-3 text-sm sm:text-base">
-                        <span className="text-lg mt-0.5 shrink-0">💀</span>
-                        <span className="text-muted-foreground">Wer einen <strong className="text-foreground">falschen Begriff</strong> nennt, zu langsam ist oder passt, fliegt raus!</span>
-                      </div>
-                      <div className="flex items-start gap-3 text-sm sm:text-base">
-                        <span className="text-lg mt-0.5 shrink-0">✏️</span>
-                        <span className="text-muted-foreground">Keine Sorge: <strong className="text-foreground">Tippfehler werden toleriert</strong>.</span>
-                      </div>
-                      <div className="flex items-start gap-3 text-sm sm:text-base">
-                        <span className="text-lg mt-0.5 shrink-0">🏆</span>
-                        <span className="text-muted-foreground">Der <strong className="text-foreground">letzte Spieler im Spiel</strong> gewinnt die meisten Punkte!</span>
-                      </div>
+                    {/* Rules Grid */}
+                    <div className="grid gap-2.5 sm:gap-3">
+                      {[
+                        {
+                          icon: '🔄',
+                          title: 'Reihum antworten',
+                          desc: <>Ihr nennt abwechselnd <strong className="text-foreground">Begriffe zu einem Thema</strong>. Wer dran ist, sieht eine leuchtende Anzeige.</>,
+                          color: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
+                          delay: 0.3,
+                        },
+                        {
+                          icon: '💣',
+                          title: `${bonusRound.timePerTurn} Sekunden pro Zug`,
+                          desc: <>Die Zündschnur brennt! Wenn sie abläuft, <strong className="text-foreground">fliegst du raus</strong>. Auch Passen oder falsche Begriffe eliminieren dich.</>,
+                          color: 'from-red-500/10 to-red-500/5 border-red-500/20',
+                          delay: 0.4,
+                        },
+                        {
+                          icon: '✏️',
+                          title: 'Tippfehler? Kein Problem!',
+                          desc: <>Eure Antworten werden <strong className="text-foreground">intelligent abgeglichen</strong> — kleine Vertipper gehen durch.</>,
+                          color: 'from-green-500/10 to-green-500/5 border-green-500/20',
+                          delay: 0.5,
+                        },
+                        {
+                          icon: '🏆',
+                          title: 'Letzter Spieler gewinnt',
+                          desc: <>Jeder richtige Begriff gibt <strong className="text-amber-400">+{bonusRound.pointsPerCorrect} Punkte</strong>. Wer am längsten überlebt, kassiert den dicken <strong className="text-amber-400">Überlebens-Bonus</strong>!</>,
+                          color: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
+                          delay: 0.6,
+                        },
+                      ].map((rule, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: rule.delay, duration: 0.35 }}
+                          className={cn(
+                            'flex items-start gap-3 p-3 sm:p-3.5 rounded-xl bg-gradient-to-r border backdrop-blur-sm',
+                            rule.color
+                          )}
+                        >
+                          <span className="text-xl sm:text-2xl mt-0.5 shrink-0">{rule.icon}</span>
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm sm:text-base text-foreground leading-tight">{rule.title}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 leading-relaxed">{rule.desc}</p>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
 
                     {/* Equalizer bars while moderator snippet plays */}
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: 0.5 }}
-                      className="flex items-end justify-center gap-1 pt-2 h-8"
+                      transition={{ delay: 0.8 }}
+                      className="flex items-center justify-center gap-3 pt-1"
                     >
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <motion.div
-                          key={i}
-                          className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
-                          animate={{ height: ['6px', `${12 + (i % 3) * 5}px`, '6px'] }}
-                          transition={{
-                            duration: 0.5 + i * 0.1,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                            delay: i * 0.08,
-                          }}
-                        />
-                      ))}
+                      <div className="flex items-end gap-1 h-7">
+                        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                          <motion.div
+                            key={i}
+                            className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                            animate={{ height: ['4px', `${10 + (i % 4) * 4}px`, '4px'] }}
+                            transition={{
+                              duration: 0.5 + i * 0.08,
+                              repeat: Infinity,
+                              ease: 'easeInOut',
+                              delay: i * 0.06,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-muted-foreground animate-pulse">Moderator erklärt...</span>
+                      <div className="flex items-end gap-1 h-7">
+                        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                          <motion.div
+                            key={i}
+                            className="w-1 rounded-full bg-gradient-to-t from-amber-500 to-orange-400"
+                            animate={{ height: ['4px', `${10 + ((i + 2) % 4) * 4}px`, '4px'] }}
+                            transition={{
+                              duration: 0.5 + i * 0.08,
+                              repeat: Infinity,
+                              ease: 'easeInOut',
+                              delay: i * 0.06 + 0.15,
+                            }}
+                          />
+                        ))}
+                      </div>
                     </motion.div>
                   </div>
                 </Card>
